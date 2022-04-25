@@ -2,19 +2,32 @@ package org.gbif.pipelines.core.converters;
 
 import static org.gbif.pipelines.core.utils.ModelUtils.extractOptValue;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.gbif.dwc.terms.DwcTerm;
+import org.gbif.dwc.terms.TermFactory;
 import org.gbif.pipelines.core.utils.HashConverter;
-import org.gbif.pipelines.io.avro.*;
+import org.gbif.pipelines.io.avro.EventCoreRecord;
+import org.gbif.pipelines.io.avro.ExtendedRecord;
+import org.gbif.pipelines.io.avro.IdentifierRecord;
+import org.gbif.pipelines.io.avro.LocationRecord;
+import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.MultimediaRecord;
+import org.gbif.pipelines.io.avro.TaxonRecord;
+import org.gbif.pipelines.io.avro.TemporalRecord;
 import org.gbif.pipelines.io.avro.grscicoll.GrscicollRecord;
-import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
 import org.gbif.pipelines.io.avro.json.EventJsonRecord;
 import org.gbif.pipelines.io.avro.json.JoinRecord;
 import org.gbif.pipelines.io.avro.json.MetadataJsonRecord;
-import org.gbif.pipelines.io.avro.json.OccurrenceJsonRecord;
+import org.gbif.pipelines.io.avro.json.OccurrenceMapRecord;
 import org.gbif.pipelines.io.avro.json.ParentJsonRecord;
 
 @Slf4j
@@ -30,51 +43,58 @@ public class ParentJsonConverter {
   private final GrscicollRecord grscicoll;
   private final MultimediaRecord multimedia;
   private final ExtendedRecord verbatim;
-  private final MeasurementOrFactRecord measurementOrFact;
-  private final DenormalisedEvent denormalisedEvent;
-  private final DerivedMetadataRecord derivedMetadata;
-  private OccurrenceJsonRecord occurrenceJsonRecord;
 
-  public ParentJsonRecord convertToParent() {
-    return (occurrenceJsonRecord != null) ? convertToParentOccurrence() : convertToParentEvent();
+  public List<ParentJsonRecord> convertToParents() {
+
+    Integer arraySize =
+        Optional.of(verbatim.getExtensions())
+            .map(exts -> exts.get(DwcTerm.Occurrence.qualifiedName()))
+            .map(List::size)
+            .map(size -> size + 1)
+            .orElse(1);
+
+    List<ParentJsonRecord> result = new ArrayList<>(arraySize);
+    result.add(convertToParentEvent());
+
+    Optional.of(verbatim.getExtensions())
+        .map(exts -> exts.get(DwcTerm.Occurrence.qualifiedName()))
+        .ifPresent(
+            l ->
+                l.stream()
+                    .map(this::convertToOccurrence)
+                    .map(this::convertToParentOccurrence)
+                    .forEach(result::add));
+
+    return result;
   }
 
-  public String toJson() {
-    return convertToParent().toString();
+  public List<String> toJsons() {
+    return convertToParents().stream().map(ParentJsonRecord::toString).collect(Collectors.toList());
   }
 
-  /** Converts to parent record based on an event record. */
   private ParentJsonRecord convertToParentEvent() {
-    return convertToParentRecord()
+    return convertToParent()
         .setType("event")
         .setJoinRecordBuilder(JoinRecord.newBuilder().setName("event"))
         .setEventBuilder(convertToEvent())
         .build();
   }
 
-  /** Converts to a parent record based on an occurrence record. */
-  private ParentJsonRecord convertToParentOccurrence() {
-    return ParentJsonRecord.newBuilder()
+  private ParentJsonRecord convertToParentOccurrence(OccurrenceMapRecord occurrenceJsonRecord) {
+    return convertToParent()
         .setType("occurrence")
-        .setId(occurrenceJsonRecord.getId())
         .setInternalId(
             HashConverter.getSha1(
-                occurrenceJsonRecord.getDatasetKey(),
-                occurrenceJsonRecord.getVerbatim().getParentCoreId(),
-                occurrenceJsonRecord.getOccurrenceId()))
+                metadata.getDatasetKey(),
+                verbatim.getId(),
+                occurrenceJsonRecord.getCore().get(DwcTerm.occurrenceID.simpleName())))
         .setJoinRecordBuilder(
-            JoinRecord.newBuilder()
-                .setName("occurrence")
-                .setParent(
-                    HashConverter.getSha1(
-                        occurrenceJsonRecord.getDatasetKey(),
-                        occurrenceJsonRecord.getVerbatim().getParentCoreId())))
+            JoinRecord.newBuilder().setName("occurrence").setParent(identifier.getInternalId()))
         .setOccurrence(occurrenceJsonRecord)
         .build();
   }
 
-  /** Converts to a parent record */
-  private ParentJsonRecord.Builder convertToParentRecord() {
+  private ParentJsonRecord.Builder convertToParent() {
     ParentJsonRecord.Builder builder =
         ParentJsonRecord.newBuilder()
             .setId(verbatim.getId())
@@ -84,12 +104,19 @@ public class ParentJsonConverter {
             .setMetadataBuilder(mapMetadataJsonRecord());
 
     mapCreated(builder);
-    mapDerivedMetadata(builder);
 
     JsonConverter.convertToDate(identifier.getFirstLoaded()).ifPresent(builder::setFirstLoaded);
     JsonConverter.convertToDate(metadata.getLastCrawled()).ifPresent(builder::setLastCrawled);
 
     return builder;
+  }
+
+  private OccurrenceMapRecord convertToOccurrence(Map<String, String> occurrenceMap) {
+    HashMap<String, String> map = new HashMap<>(occurrenceMap.size());
+    for (Entry<String, String> entry : occurrenceMap.entrySet()) {
+      map.put(TermFactory.instance().findTerm(entry.getKey()).simpleName(), entry.getValue());
+    }
+    return OccurrenceMapRecord.newBuilder().setCore(map).build();
   }
 
   private EventJsonRecord.Builder convertToEvent() {
@@ -104,9 +131,6 @@ public class ParentJsonConverter {
     mapLocationRecord(builder);
     mapMultimediaRecord(builder);
     mapExtendedRecord(builder);
-    mapTaxonRecord(builder);
-    mapMeasurementOrFactRecord(builder);
-    mapDenormalisedEvent(builder);
 
     return builder;
   }
@@ -127,74 +151,6 @@ public class ParentJsonConverter {
         .setPublishingOrganizationKey(metadata.getPublishingOrganizationKey());
   }
 
-  private void mapDenormalisedEvent(EventJsonRecord.Builder builder) {
-
-    if (denormalisedEvent.getParents() != null & !denormalisedEvent.getParents().isEmpty()) {
-
-      List<String> eventTypes = new ArrayList<>();
-      List<String> eventIDs = new ArrayList<>();
-
-      boolean hasCoordsInfo = builder.getDecimalLatitude() != null;
-      boolean hasCountryInfo = builder.getCountryCode() != null;
-      boolean hasStateInfo = builder.getStateProvince() != null;
-      boolean hasYearInfo = builder.getYear() != null;
-      boolean hasMonthInfo = builder.getMonth() != null;
-      boolean hasLocationID = builder.getLocationID() != null;
-
-      // extract location & temporal information from
-      denormalisedEvent
-          .getParents()
-          .forEach(
-              parent -> {
-                if (!hasYearInfo && parent.getYear() != null) {
-                  builder.setYear(parent.getYear());
-                }
-
-                if (!hasMonthInfo && parent.getMonth() != null) {
-                  builder.setMonth(parent.getMonth());
-                }
-
-                if (!hasCountryInfo && parent.getCountryCode() != null) {
-                  builder.setCountryCode(parent.getCountryCode());
-                }
-
-                if (!hasStateInfo && parent.getStateProvince() != null) {
-                  builder.setStateProvince(parent.getStateProvince());
-                }
-
-                if (!hasCoordsInfo
-                    && parent.getDecimalLatitude() != null
-                    && parent.getDecimalLongitude() != null) {
-                  builder
-                      .setHasCoordinate(true)
-                      .setDecimalLatitude(parent.getDecimalLatitude())
-                      .setDecimalLongitude(parent.getDecimalLongitude())
-                      // geo_point
-                      .setCoordinates(
-                          JsonConverter.convertCoordinates(
-                              parent.getDecimalLongitude(), parent.getDecimalLatitude()))
-                      // geo_shape
-                      .setScoordinates(
-                          JsonConverter.convertScoordinates(
-                              parent.getDecimalLongitude(), parent.getDecimalLatitude()));
-                }
-
-                if (!hasLocationID && parent.getLocationID() != null) {
-                  builder.setLocationID(parent.getLocationID());
-                }
-
-                eventIDs.add(parent.getEventID());
-                eventTypes.add(parent.getEventType());
-              });
-
-      builder.setEventHierarchy(eventIDs);
-      builder.setEventTypeHierarchy(eventTypes);
-      builder.setEventHierarchyJoined(String.join(" / ", eventIDs));
-      builder.setEventTypeHierarchyJoined(String.join(" / ", eventTypes));
-      builder.setEventHierarchyLevels(eventIDs.size());
-    }
-  }
-
   private void mapEventCoreRecord(EventJsonRecord.Builder builder) {
 
     // Simple
@@ -204,9 +160,7 @@ public class ParentJsonConverter {
         .setReferences(eventCore.getReferences())
         .setDatasetID(eventCore.getDatasetID())
         .setDatasetName(eventCore.getDatasetName())
-        .setSamplingProtocol(eventCore.getSamplingProtocol())
-        .setParentEventIds(eventCore.getParentEventIds())
-        .setParentEventId(eventCore.getParentEventID());
+        .setSamplingProtocol(eventCore.getSamplingProtocol());
 
     // Vocabulary
     JsonConverter.convertVocabularyConcept(eventCore.getEventType())
@@ -273,12 +227,6 @@ public class ParentJsonConverter {
     JsonConverter.convertGadm(location.getGadm()).ifPresent(builder::setGadm);
   }
 
-  private void mapTaxonRecord(EventJsonRecord.Builder builder) {
-    if (taxon != null) {
-      builder.setGbifClassification(JsonConverter.convertClassification(verbatim, taxon));
-    }
-  }
-
   private void mapMultimediaRecord(EventJsonRecord.Builder builder) {
     builder
         .setMultimediaItems(JsonConverter.convertMultimediaList(multimedia))
@@ -286,60 +234,8 @@ public class ParentJsonConverter {
         .setMediaLicenses(JsonConverter.convertMultimediaLicense(multimedia));
   }
 
-  private List<String> extractDistinctFromExtension(String extensionQualifiedName, String term) {
-    return Optional.of(verbatim.getExtensions())
-        .map(exts -> exts.get(extensionQualifiedName))
-        .map(ext -> extractDistinct(term, ext))
-        .orElse(new ArrayList<String>());
-  }
-
-  private List<String> extractDistinct(String term, List<Map<String, String>> extension) {
-    return extension.stream()
-        .map(r -> r.get(term))
-        .distinct()
-        .filter(x -> x != null)
-        .limit(100)
-        .collect(Collectors.toList());
-  }
-
   private void mapExtendedRecord(EventJsonRecord.Builder builder) {
-
-    // set occurrence count
-    Integer occurrenceCount =
-        Optional.of(verbatim.getExtensions())
-            .map(exts -> exts.get(DwcTerm.Occurrence.qualifiedName()))
-            .map(ext -> ext.size())
-            .orElse(0);
-
-    builder.setOccurrenceCount(occurrenceCount);
-
-    List<String> kingdoms =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.kingdom.qualifiedName());
-    List<String> phyla =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.phylum.qualifiedName());
-    List<String> classes =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.class_.qualifiedName());
-    List<String> orders =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.order.qualifiedName());
-    List<String> families =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.family.qualifiedName());
-    List<String> genera =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.genus.qualifiedName());
-
-    builder.setKingdoms(kingdoms);
-    builder.setPhyla(phyla);
-    builder.setOrders(orders);
-    builder.setClasses(classes);
-    builder.setFamilies(families);
-    builder.setGenera(genera);
-
-    builder.setExtensions(JsonConverter.convertExtensions(verbatim));
+    builder.setExtensions(JsonConverter.convertExtenstions(verbatim));
 
     // Set raw as indexed
     extractOptValue(verbatim, DwcTerm.eventID).ifPresent(builder::setEventId);
@@ -347,30 +243,6 @@ public class ParentJsonConverter {
     extractOptValue(verbatim, DwcTerm.institutionCode).ifPresent(builder::setInstitutionCode);
     extractOptValue(verbatim, DwcTerm.verbatimDepth).ifPresent(builder::setVerbatimDepth);
     extractOptValue(verbatim, DwcTerm.verbatimElevation).ifPresent(builder::setVerbatimElevation);
-    extractOptValue(verbatim, DwcTerm.locationID).ifPresent(builder::setLocationID);
-  }
-
-  private void mapMeasurementOrFactRecord(EventJsonRecord.Builder builder) {
-    if (measurementOrFact != null) {
-
-      List<String> methods =
-          measurementOrFact.getMeasurementOrFactItems().stream()
-              .map(mof -> mof.getMeasurementMethod())
-              .filter(s -> Objects.nonNull(s))
-              .distinct()
-              .collect(Collectors.toList());
-
-      List<String> types =
-          measurementOrFact.getMeasurementOrFactItems().stream()
-              .map(mof -> mof.getMeasurementType())
-              .filter(s -> Objects.nonNull(s))
-              .distinct()
-              .collect(Collectors.toList());
-
-      builder.setMeasurementOrFactMethods(methods);
-      builder.setMeasurementOrFactTypes(types);
-      builder.setMeasurementOrFactCount(measurementOrFact.getMeasurementOrFactItems().size());
-    }
   }
 
   private void mapIssues(EventJsonRecord.Builder builder) {
@@ -383,9 +255,5 @@ public class ParentJsonConverter {
   private void mapCreated(ParentJsonRecord.Builder builder) {
     JsonConverter.getMaxCreationDate(metadata, eventCore, temporal, location, multimedia)
         .ifPresent(builder::setCreated);
-  }
-
-  private void mapDerivedMetadata(ParentJsonRecord.Builder builder) {
-    builder.setDerivedMetadata(derivedMetadata);
   }
 }
