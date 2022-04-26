@@ -1,6 +1,15 @@
 /** Represents the event json object for indexing */
 [
   {
+    "name" : "Parent",
+    "namespace" : "org.gbif.pipelines.io.avro.json",
+    "type" : "record",
+    "fields" : [
+      {"name": "id", "type": ["null", "string"], "default" : null, "doc":""},
+      {"name": "eventType", "type": ["null", "string"], "default" : null, "doc": ""}
+    ]
+  },
+  {
     "name":"EventJsonRecord",
     "namespace":"org.gbif.pipelines.io.avro.json",
     "type":"record",
@@ -16,7 +25,7 @@
       {"name":"lastCrawled","type":["null","string"],"default":null,"doc":""},
       {"name":"created","type":["null","string"],"default":null,"doc":""},
       {"name":"crawlId","type":["null","int"],"default":null,"doc":""},
-      {"name":"parentEventIds","type":{"type":"array","items":"string"},"default":null,"doc":""},
+      {"name": "parentsLineage", "type": {"type" : "array", "items" : "Parent"}, "default" : [], "doc":""},
       // Metadata
       {"name":"datasetKey","type":["null","string"],"default":null,"doc":""},
       {"name":"datasetTitle","type":["null","string"],"default":null,"doc":""},
@@ -56,7 +65,6 @@
       {"name":"startDayOfYear","type":["null","int"],"default":null,"doc":""},
       {"name":"endDayOfYear","type":["null","int"],"default":null,"doc":""},
       // Location
-      {"name":"locationID","type":["null","string"],"default":null,"doc":""},
       {"name":"locality","type":["null","string"],"default":null,"doc":""},
       {"name":"continent","type":["null","string"],"default":null,"doc":""},
       {"name":"waterBody","type":["null","string"],"default":null,"doc":""},
@@ -88,6 +96,9 @@
       {"name":"mediaTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"mediaLicenses","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"multimediaItems","type":{"type":"array","items":"Multimedia"},"default":null,"doc":""},
+      // MeasurementOrFact
+      {"name":"measurementOrFactTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
+      {"name":"measurementOrFactMethods","type":{"type":"array","items":"string"},"default":null,"doc":""},
       // Extra
       {"name":"issues","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"notIssues","type":{"type":"array","items":"string"},"default":[],"doc":""},
@@ -96,21 +107,12 @@
       // Aggregations
       {"name":"occurrenceCount","type":["null","int"],"default":null,"doc":""},
       {"name":"childEventCount","type":["null","int"],"default":null,"doc":""},
-      {"name":"measurementOrFactTypes","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"measurementOrFactMethods","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"measurementOrFactCount","type":["null","int"],"default":null,"doc":""},
-      {"name":"kingdoms","type":{"type":"array","items":"string"},"default":[],"doc":""},
+      {"name":"measurementOrFacts","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"phyla","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"classes","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"orders","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"families","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"genera","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      // Denormalised event info
-      {"name":"eventHierarchy","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"eventTypeHierarchy","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"eventHierarchyJoined","type":["null","string"],"default":null,"doc":""},
-      {"name":"eventTypeHierarchyJoined","type":["null","string"],"default":null,"doc":""},
-      {"name":"eventHierarchyLevels","type":["null","int"],"default":null,"doc":""}
+      {"name":"genera","type":{"type":"array","items":"string"},"default":[],"doc":""}
     ]
   }
 ]
