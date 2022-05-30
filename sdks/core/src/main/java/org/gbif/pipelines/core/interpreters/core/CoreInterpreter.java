@@ -10,11 +10,9 @@ import static org.gbif.pipelines.core.utils.ModelUtils.extractValue;
 import com.google.common.base.Strings;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -25,12 +23,8 @@ import org.gbif.common.parsers.NumberParser;
 import org.gbif.common.parsers.UrlParser;
 import org.gbif.dwc.terms.DcTerm;
 import org.gbif.dwc.terms.DwcTerm;
-import org.gbif.dwc.terms.GbifTerm;
-import org.gbif.pipelines.core.parsers.vocabulary.VocabularyService;
-import org.gbif.pipelines.io.avro.EventCoreRecord;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.Issues;
-import org.gbif.pipelines.io.avro.Parent;
 
 /**
  * Interpreting function that receives a ExtendedRecord instance and applies an interpretation to
@@ -78,14 +72,14 @@ public class CoreInterpreter {
     consumer.accept(license);
   }
 
+  /** {@link DwcTerm#parentEventID} interpretation. */
+  public static void interpretParentEventID(ExtendedRecord er, Consumer<String> consumer) {
+    extractOptValue(er, DwcTerm.parentEventID).ifPresent(consumer);
+  }
+
   /** {@link DwcTerm#locationID} interpretation. */
   public static void interpretLocationID(ExtendedRecord er, Consumer<String> consumer) {
     extractOptValue(er, DwcTerm.locationID).ifPresent(consumer);
-  }
-
-  /** {@link DwcTerm#datasetID} interpretation. */
-  public static void interpretParentEventID(ExtendedRecord er, Consumer<String> consumer) {
-    extractOptValue(er, DwcTerm.parentEventID).ifPresent(consumer);
   }
 
   /** {@link DwcTerm#datasetID} interpretation. */
@@ -103,32 +97,25 @@ public class CoreInterpreter {
     extractNullAwareOptValue(er, DwcTerm.parentEventID).ifPresent(consumer);
   }
 
-  public static BiConsumer<ExtendedRecord, EventCoreRecord> interpretLineages(
-      Map<String, Map<String, String>> erWithParents, VocabularyService vocabularyService) {
-    return (er, evr) -> {
-      String parentEventID = extractValue(er, DwcTerm.parentEventID);
+  /** Interprets the hierarchy of {@link DwcTerm#parentEventID}. */
+  public static void interpretParentEventIDHierarchy(
+      ExtendedRecord er, Map<String, String> erWithParents, Consumer<List<String>> consumer) {
+    String parentEventID = extractValue(er, DwcTerm.parentEventID);
 
-      if (parentEventID == null) {
-        return;
-      }
+    if (parentEventID == null) {
+      return;
+    }
 
-      // parent event IDs
-      List<Parent> parents = new ArrayList<>();
-      while (parentEventID != null) {
-        Map<String, String> parentValues =
-            erWithParents.getOrDefault(parentEventID, new HashMap<>());
+    // parent event IDs
+    List<String> parentEventIds = new ArrayList<>();
+    while (parentEventID != null) {
+      parentEventIds.add(parentEventID);
+      parentEventID = erWithParents.get(parentEventID);
+    }
 
-        Parent.Builder parentBuilder = Parent.newBuilder().setId(parentEventID);
-        VocabularyInterpreter.interpretVocabulary(
-                GbifTerm.eventType, parentValues.get(GbifTerm.eventType.name()), vocabularyService)
-            .ifPresent(c -> parentBuilder.setEventType(c.getConcept()));
-        parents.add(parentBuilder.build());
-
-        parentEventID = parentValues.get(DwcTerm.parentEventID.name());
-      }
-
-      evr.setParentsLineage(parents);
-    };
+    if (!parentEventIds.isEmpty()) {
+      consumer.accept(parentEventIds);
+    }
   }
 
   /** {@link DwcTerm#samplingProtocol} interpretation. */
