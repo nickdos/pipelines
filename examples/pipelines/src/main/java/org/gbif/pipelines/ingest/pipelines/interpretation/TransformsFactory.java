@@ -54,7 +54,7 @@ import org.gbif.rest.client.geocode.GeocodeResponse;
 import org.gbif.rest.client.grscicoll.GrscicollLookupResponse;
 import org.gbif.rest.client.species.NameUsageMatch;
 
-/** Copied from ingest-gbif module as we want to avoid dependencies on this module * */
+/** Copied from ingest-gbif module as we want to avoid dependencies on this module **/
 @Getter
 public class TransformsFactory {
 
