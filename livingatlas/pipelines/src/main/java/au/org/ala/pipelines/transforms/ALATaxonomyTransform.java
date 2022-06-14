@@ -117,35 +117,7 @@ public class ALATaxonomyTransform extends Transform<ExtendedRecord, ALATaxonReco
 
   /** Beam @Teardown closes initialized resources */
   @Teardown
-  public void tearDown() {
-    // This section if uncommented cause CacheClosedExceptions
-    // to be thrown by the ALADefaultValuesTransform due to its use
-    // of the dataResourceStore
-
-    //    if (Objects.nonNull(this.dataResourceStore)) {
-    //      try {
-    //        log.info("Close NameUsageMatchKvStore");
-    //        this.dataResourceStore.close();
-    //      } catch (IOException ex) {
-    //        log.error("Error closing KV Store", ex);
-    //      }
-    //    }
-    //    if (Objects.nonNull(this.kingdomMatchStore)) {
-    //      try {
-    //        log.info("Close NameCheckKvStore");
-    //        this.kingdomCheckStore.close();
-    //      } catch (IOException ex) {
-    //        log.error("Error closing KV Store", ex);
-    //      }
-    //    if (Objects.nonNull(this.nameMatchStore)) {
-    //      try {
-    //        log.info("Close NameUsageMatchKvStore");
-    //        this.nameMatchStore.close();
-    //      } catch (IOException ex) {
-    //        log.error("Error closing KV Store", ex);
-    //      }
-    //    }
-  }
+  public void tearDown() {}
 
   @Override
   public Optional<ALATaxonRecord> convert(ExtendedRecord source) {
