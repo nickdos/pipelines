@@ -479,3 +479,16 @@ solr-sh-args:
     executor-cores: 8
     executor-memory: 22G
     driver-memory: 6G
+
+elastic-sh-args:
+  local:
+    jvm: -Xmx8g -XX:+UseG1GC
+  spark-embedded:
+    jvm: -Xmx8g -XX:+UseG1GC
+  spark-cluster:
+    conf: spark.default.parallelism=48
+    num-executors: 6
+    executor-cores: 8
+    executor-memory: 22G
+    driver-memory: 6G
+
