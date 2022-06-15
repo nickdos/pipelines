@@ -1,4 +1,4 @@
-package org.gbif.pipelines.ingest.pipelines;
+package au.org.ala.pipelines.beam;
 
 import static org.gbif.pipelines.core.utils.ModelUtils.extractOptValue;
 
@@ -7,10 +7,8 @@ import au.org.ala.kvs.cache.ALAAttributionKVStoreFactory;
 import au.org.ala.kvs.cache.ALANameCheckKVStoreFactory;
 import au.org.ala.kvs.cache.ALANameMatchKVStoreFactory;
 import au.org.ala.kvs.cache.GeocodeKvStoreFactory;
-import au.org.ala.pipelines.transforms.ALATaxonomyTransform;
-import au.org.ala.pipelines.transforms.ALATemporalTransform;
+import au.org.ala.pipelines.transforms.*;
 import au.org.ala.pipelines.transforms.LocationTransform;
-import au.org.ala.pipelines.transforms.MetadataTransform;
 import au.org.ala.utils.CombinedYamlConfiguration;
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -40,7 +38,6 @@ import org.gbif.pipelines.common.beam.utils.PathBuilder;
 import org.gbif.pipelines.core.pojo.HdfsConfigs;
 import org.gbif.pipelines.core.utils.FsUtils;
 import org.gbif.pipelines.factory.FileVocabularyFactory;
-import org.gbif.pipelines.ingest.pipelines.interpretation.TransformsFactory;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
 import org.gbif.pipelines.transforms.core.*;
@@ -77,7 +74,7 @@ import org.slf4j.MDC;
  */
 @Slf4j
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class ALAVerbatimToInterpretedPipeline {
+public class ALAVerbatimToEventPipeline {
 
   private static final DwcTerm CORE_TERM = DwcTerm.Event;
 

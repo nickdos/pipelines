@@ -333,7 +333,8 @@ public class InterpretedToParentIndexPipeline {
 
       // Creates a Map of all events and its sub events
       PCollection<KV<String, TemporalRecord>> temporalRecordsOfSubEvents =
-          ParentEventExpandTransform.of(temporalTransform.getTag(), eventCoreTransform.getTag())
+          ParentEventExpandTransform.createTemporalTransform(
+                  temporalTransform.getTag(), eventCoreTransform.getTag())
               .toSubEventsRecords("Temporal", temporalCollection, eventCoreCollection);
 
       return PCollectionList.of(temporalCollection)
@@ -355,7 +356,8 @@ public class InterpretedToParentIndexPipeline {
               .apply("Map occurrence events locations to KV", parentLocationTransform.toParentKv());
 
       PCollection<KV<String, LocationRecord>> locationRecordsOfSubEvents =
-          ParentEventExpandTransform.of(locationTransform.getTag(), eventCoreTransform.getTag())
+          ParentEventExpandTransform.createLocationTransform(
+                  locationTransform.getTag(), eventCoreTransform.getTag())
               .toSubEventsRecords("Location", locationCollection, eventCoreCollection);
 
       return PCollectionList.of(locationCollection)
@@ -366,27 +368,30 @@ public class InterpretedToParentIndexPipeline {
               "Calculate the WKT Convex Hull of all records", Combine.perKey(new ConvexHullFn()));
     }
 
-    private PCollection<KV<String, Iterable<ALATaxonRecord>>> taxonomicCoverage() {
-      PCollection<KV<String, ALATaxonRecord>> eventOccurrencesTaxonCollection =
-          pipeline
-              .apply(
-                  "Read event occurrences taxon records", taxonomyTransform.read(occurrencesPathFn))
-              //                      .apply(
-              //                              "Remove taxon records with null parent ids",
-              //
-              // Filter.by(NotNullOrEmptyFilter.of(ALATaxonRecord::get)))
-              .apply("Map event occurrences taxon to KV", taxonomyTransform.toParentKv());
-
-      PCollection<KV<String, ALATaxonRecord>> taxonRecordsOfSubEvents =
-          ParentEventExpandTransform.of(taxonomyTransform.getTag(), eventCoreTransform.getTag())
-              .toSubEventsRecords("Taxon", taxonCollection, eventCoreCollection);
-
-      return PCollectionList.of(taxonCollection)
-          .and(eventOccurrencesTaxonCollection)
-          .and(taxonRecordsOfSubEvents)
-          .apply("Join event and occurrence taxon records", Flatten.pCollections())
-          .apply("Select a sample of taxon records", Sample.fixedSizePerKey(1000));
-    }
+    //    private PCollection<KV<String, Iterable<ALATaxonRecord>>> taxonomicCoverage() {
+    //      PCollection<KV<String, ALATaxonRecord>> eventOccurrencesTaxonCollection =
+    //          pipeline
+    //              .apply(
+    //                  "Read event occurrences taxon records",
+    // taxonomyTransform.read(occurrencesPathFn))
+    //              //                      .apply(
+    //              //                              "Remove taxon records with null parent ids",
+    //              //
+    //              // Filter.by(NotNullOrEmptyFilter.of(ALATaxonRecord::get)))
+    //              .apply("Map event occurrences taxon to KV", taxonomyTransform.toParentKv());
+    //
+    //      PCollection<KV<String, ALATaxonRecord>> taxonRecordsOfSubEvents =
+    //              ParentEventExpandTransform.createTaxonTransform(
+    //                              taxonomyTransform.getTag(), eventCoreTransform.getTag())
+    //                      .toSubEventsRecords("Taxon", taxonCollection, eventCoreCollection);
+    //
+    //      return PCollectionList.of(taxonCollection)
+    //          .and(eventOccurrencesTaxonCollection)
+    //          .and(taxonRecordsOfSubEvents)
+    //          .apply("Join event and occurrence taxon records", Flatten.pCollections())
+    //          .apply("Select a sample of taxon records", Sample.fixedSizePerKey(1000));
+    //      return PCollectionList.empty(pipeline);
+    //    }
 
     private static final TupleTag<Iterable<ALATaxonRecord>> ITERABLE_ALA_TAXON_TAG =
         new TupleTag<Iterable<ALATaxonRecord>>() {};
@@ -403,7 +408,7 @@ public class InterpretedToParentIndexPipeline {
 
       return KeyedPCollectionTuple.of(ConvexHullFn.tag(), convexHull())
           .and(TemporalCoverageFn.tag(), temporalCoverage())
-          .and(ITERABLE_ALA_TAXON_TAG, taxonomicCoverage())
+          //          .and(ITERABLE_ALA_TAXON_TAG, taxonomicCoverage())
           .and(
               verbatimTransform.getTag(),
               PCollectionList.of(eventOccurrenceVerbatimCollection)

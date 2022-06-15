@@ -143,9 +143,9 @@ public class ParentJsonTransform implements Serializable {
                     .multimedia(mmr)
                     .verbatim(er)
                     //                    .taxon(txr)
-                    .measurementOrFact(mofr)
-                    .denormalisedEvent(de)
                     //                    .derivedMetadata(dmr)
+                    .measurementOrFactRecord(mofr)
+                    .denormalisedEvent(de)
                     .build()
                     .toJson();
 

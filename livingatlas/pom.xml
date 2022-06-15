@@ -23,6 +23,7 @@
     <module>pipelines</module>
     <module>migration</module>
     <module>bitmap</module>
+    <module>tree-denorm</module>
   </modules>
 
 </project>

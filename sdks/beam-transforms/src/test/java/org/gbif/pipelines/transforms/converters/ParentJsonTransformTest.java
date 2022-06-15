@@ -381,7 +381,7 @@ public class ParentJsonTransformTest {
             .multimedia(mmr)
             .verbatim(er)
             .derivedMetadata(dmr)
-            .measurementOrFact(mofr)
+            .measurementOrFactRecord(mofr)
             .build()
             .toJson();
 

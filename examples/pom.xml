@@ -19,7 +19,6 @@
     <module>transform</module>
     <module>metrics</module>
     <module>pipelines</module>
-    <module>tree-denorm</module>
   </modules>
 
 </project>

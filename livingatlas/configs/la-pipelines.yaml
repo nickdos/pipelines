@@ -245,6 +245,20 @@ solr:
   runner: SparkRunner
   zkHost: localhost:9983
 
+# class: au.org.ala.pipelines.beam.IndexRecordToSolrPipeline
+elastic:
+  appName: Elastic indexing for {datasetId}
+  inputPath: '{fsPath}/pipelines-data'
+  targetPath: '{fsPath}/pipelines-data'
+  runner: SparkRunner
+  esHosts: http://localhost:9200
+  esSchemaPath: /tmp/es-parent-schema.json
+  esAlias: event
+  esIndexName: 'event_{datasetId}'
+  indexNumberShards: 1
+  indexNumberReplicas: 0
+  esDocumentId: internalId
+
 export:
   appName: DwCA export for {datasetId}
   inputPath: '{fsPath}/pipelines-data'
