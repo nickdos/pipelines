@@ -5,12 +5,15 @@ import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.ALL_AVRO;
 import au.org.ala.pipelines.transforms.ALATaxonomyTransform;
 import au.org.ala.pipelines.util.ElasticsearchTools;
 import au.org.ala.utils.CombinedYamlConfiguration;
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.io.AvroIO;
@@ -29,6 +32,8 @@ import org.gbif.pipelines.common.beam.options.PipelinesOptionsFactory;
 import org.gbif.pipelines.common.beam.utils.PathBuilder;
 import org.gbif.pipelines.io.avro.*;
 import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
+import org.gbif.pipelines.transforms.common.NotNullOrEmptyFilter;
+import org.gbif.pipelines.transforms.converters.ParentEventExpandTransform;
 import org.gbif.pipelines.transforms.converters.ParentJsonTransform;
 import org.gbif.pipelines.transforms.core.*;
 import org.gbif.pipelines.transforms.extension.AudubonTransform;
@@ -70,6 +75,8 @@ import org.slf4j.MDC;
  *
  * }</pre>
  */
+@Slf4j
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ALAEventToEsIndexPipeline {
 
   private static final DwcTerm CORE_TERM = DwcTerm.Event;
@@ -95,7 +102,7 @@ public class ALAEventToEsIndexPipeline {
 
     ElasticsearchTools.createIndexAndAliasForDefault(options);
 
-    System.out.println("Adding step 1: Options");
+    log.info("Adding step 1: Options");
     UnaryOperator<String> pathFn =
         t -> PathBuilder.buildPathInterpretUsingTargetPath(options, CORE_TERM, t, ALL_AVRO);
 
@@ -106,7 +113,7 @@ public class ALAEventToEsIndexPipeline {
     options.setAppName("Event indexing of " + options.getDatasetId());
     Pipeline p = pipelinesFn.apply(options);
 
-    System.out.println("Adding step 2: Creating transformations");
+    log.info("Adding step 2: Creating transformations");
     MetadataTransform metadataTransform = MetadataTransform.builder().create();
     // Core
     EventCoreTransform eventCoreTransform = EventCoreTransform.builder().create();
@@ -124,7 +131,7 @@ public class ALAEventToEsIndexPipeline {
     AudubonTransform audubonTransform = AudubonTransform.builder().create();
     ImageTransform imageTransform = ImageTransform.builder().create();
 
-    System.out.println("Adding step 3: Creating beam pipeline");
+    log.info("Adding step 3: Creating beam pipeline");
     PCollectionView<MetadataRecord> metadataView =
         p.apply("Read Metadata", metadataTransform.read(pathFn))
             .apply("Convert to view", View.asSingleton());
@@ -192,7 +199,7 @@ public class ALAEventToEsIndexPipeline {
             .build()
             .calculate();
 
-    System.out.println("Adding step 3: Converting into a json object");
+    log.info("Adding step 3: Converting into a json object");
     SingleOutput<KV<String, CoGbkResult>, String> eventJsonDoFn =
         ParentJsonTransform.builder()
             .extendedRecordTag(verbatimTransform.getTag())
@@ -227,13 +234,13 @@ public class ALAEventToEsIndexPipeline {
             .and(measurementOrFactTransform.getTag(), measurementOrFactCollection)
             // denorm
             .and(denormalisedEventTag, denormCollection)
-            //             Derived metadata
+            // Derived metadata
             .and(DerivedMetadataTransform.tag(), derivedMetadataRecordCollection)
             // Apply
             .apply("Grouping objects", CoGroupByKey.create())
             .apply("Merging to json", eventJsonDoFn);
 
-    System.out.println("Adding step 4: Elasticsearch indexing");
+    log.info("Adding step 4: Elasticsearch indexing");
 
     ElasticsearchIO.ConnectionConfiguration esConfig =
         ElasticsearchIO.ConnectionConfiguration.create(
@@ -249,43 +256,28 @@ public class ALAEventToEsIndexPipeline {
             .withConnectionConfiguration(esConfig)
             .withMaxBatchSizeBytes(options.getEsMaxBatchSizeBytes())
             .withRoutingFn(
-                new ElasticsearchIO.Write.FieldValueExtractFn() {
-                  @Override
-                  public String apply(JsonNode input) {
-                    return Optional.of(input.get("joinRecord"))
+                input ->
+                    Optional.of(input.get("joinRecord"))
                         .filter(i -> i.hasNonNull("parent"))
                         .map(i -> i.get("parent").asText())
-                        .orElse(input.get("internalId").asText());
-                  }
-                })
+                        .orElse(input.get("internalId").asText()))
             .withMaxBatchSize(options.getEsMaxBatchSize());
 
     // Ignore gbifID as ES doc ID, useful for validator
     if (esDocumentId != null && !esDocumentId.isEmpty()) {
-      writeIO =
-          writeIO.withIdFn(
-              new ElasticsearchIO.Write.FieldValueExtractFn() {
-                @Override
-                public String apply(JsonNode input) {
-                  return input.get(esDocumentId).asText();
-                }
-              });
+      writeIO = writeIO.withIdFn(input -> input.get(esDocumentId).asText());
     }
 
     jsonCollection.apply(writeIO);
 
-    System.out.println("Running the pipeline");
-    try {
-      PipelineResult result = p.run();
-      result.waitUntilFinish();
-      System.out.println("Save metrics into the file and set files owner");
-      MetricsHandler.saveCountersToTargetPathFile(options, result.metrics());
-    } catch (Exception e) {
-      System.out.println("Exception thrown");
-      e.printStackTrace();
-    }
+    log.info("Running the pipeline");
+    PipelineResult result = p.run();
+    result.waitUntilFinish();
 
-    System.out.println("Pipeline has been finished");
+    log.info("Save metrics into the file and set files owner");
+    MetricsHandler.saveCountersToTargetPathFile(options, result.metrics());
+
+    log.info("Pipeline has been finished");
   }
 
   /** Load image service records for a dataset. */
@@ -308,5 +300,129 @@ public class ALAEventToEsIndexPipeline {
                 MapElements.into(new TypeDescriptor<KV<String, DenormalisedEvent>>() {})
                     .via((DenormalisedEvent tr) -> KV.of(tr.getId(), tr)));
     return denorm;
+  }
+
+  @Builder
+  static class DerivedMetadata {
+    private final Pipeline pipeline;
+    private final VerbatimTransform verbatimTransform;
+    private final TemporalTransform temporalTransform;
+    private final LocationTransform parentLocationTransform;
+    private final ALATaxonomyTransform taxonomyTransform;
+    private final EventCoreTransform eventCoreTransform;
+    private final LocationTransform locationTransform;
+    private final PCollection<KV<String, ExtendedRecord>> verbatimCollection;
+    private final PCollection<KV<String, TemporalRecord>> temporalCollection;
+    private final PCollection<KV<String, LocationRecord>> locationCollection;
+    private final PCollection<KV<String, ALATaxonRecord>> taxonCollection;
+    private final PCollection<KV<String, EventCoreRecord>> eventCoreCollection;
+    private final UnaryOperator<String> occurrencesPathFn;
+
+    /** Calculates the simple Temporal Coverage of an Event. */
+    private PCollection<KV<String, EventDate>> temporalCoverage() {
+      PCollection<KV<String, TemporalRecord>> eventOccurrenceTemporalCollection =
+          pipeline
+              .apply(
+                  "Read occurrence event temporal records",
+                  temporalTransform.read(occurrencesPathFn))
+              .apply(
+                  "Remove temporal records with null parent ids",
+                  Filter.by(NotNullOrEmptyFilter.of(TemporalRecord::getParentId)))
+              .apply(
+                  "Map occurrence events temporal records to KV", temporalTransform.toParentKv());
+
+      // Creates a Map of all events and its sub events
+      PCollection<KV<String, TemporalRecord>> temporalRecordsOfSubEvents =
+          ParentEventExpandTransform.createTemporalTransform(
+                  temporalTransform.getTag(), eventCoreTransform.getTag())
+              .toSubEventsRecords("Temporal", temporalCollection, eventCoreCollection);
+
+      return PCollectionList.of(temporalCollection)
+          .and(eventOccurrenceTemporalCollection)
+          .and(temporalRecordsOfSubEvents)
+          .apply("Joining temporal records", Flatten.pCollections())
+          .apply("Calculate the temporal coverage", Combine.perKey(new TemporalCoverageFn()));
+    }
+
+    private PCollection<KV<String, String>> convexHull() {
+      PCollection<KV<String, LocationRecord>> eventOccurrenceLocationCollection =
+          pipeline
+              .apply(
+                  "Read occurrence events locations",
+                  parentLocationTransform.read(occurrencesPathFn))
+              .apply(
+                  "Remove location records with null parent ids",
+                  Filter.by(NotNullOrEmptyFilter.of(LocationRecord::getParentId)))
+              .apply("Map occurrence events locations to KV", parentLocationTransform.toParentKv());
+
+      PCollection<KV<String, LocationRecord>> locationRecordsOfSubEvents =
+          ParentEventExpandTransform.createLocationTransform(
+                  locationTransform.getTag(), eventCoreTransform.getTag())
+              .toSubEventsRecords("Location", locationCollection, eventCoreCollection);
+
+      return PCollectionList.of(locationCollection)
+          .and(eventOccurrenceLocationCollection)
+          .and(locationRecordsOfSubEvents)
+          .apply("Joining location records", Flatten.pCollections())
+          .apply(
+              "Calculate the WKT Convex Hull of all records", Combine.perKey(new ConvexHullFn()));
+    }
+
+    //    private PCollection<KV<String, Iterable<ALATaxonRecord>>> taxonomicCoverage() {
+    //      PCollection<KV<String, ALATaxonRecord>> eventOccurrencesTaxonCollection =
+    //          pipeline
+    //              .apply(
+    //                  "Read event occurrences taxon records",
+    // taxonomyTransform.read(occurrencesPathFn))
+    //              //                      .apply(
+    //              //                              "Remove taxon records with null parent ids",
+    //              //
+    //              // Filter.by(NotNullOrEmptyFilter.of(ALATaxonRecord::get)))
+    //              .apply("Map event occurrences taxon to KV", taxonomyTransform.toParentKv());
+    //
+    //      PCollection<KV<String, ALATaxonRecord>> taxonRecordsOfSubEvents =
+    //              ParentEventExpandTransform.createTaxonTransform(
+    //                              taxonomyTransform.getTag(), eventCoreTransform.getTag())
+    //                      .toSubEventsRecords("Taxon", taxonCollection, eventCoreCollection);
+    //
+    //      return PCollectionList.of(taxonCollection)
+    //          .and(eventOccurrencesTaxonCollection)
+    //          .and(taxonRecordsOfSubEvents)
+    //          .apply("Join event and occurrence taxon records", Flatten.pCollections())
+    //          .apply("Select a sample of taxon records", Sample.fixedSizePerKey(1000));
+    //      return PCollectionList.empty(pipeline);
+    //    }
+
+    private static final TupleTag<Iterable<ALATaxonRecord>> ITERABLE_ALA_TAXON_TAG =
+        new TupleTag<Iterable<ALATaxonRecord>>() {};
+
+    PCollection<KV<String, DerivedMetadataRecord>> calculate() {
+
+      PCollection<KV<String, ExtendedRecord>> eventOccurrenceVerbatimCollection =
+          pipeline
+              .apply("Read event occurrences verbatim", verbatimTransform.read(occurrencesPathFn))
+              .apply(
+                  "Remove verbatim records with null parent ids",
+                  Filter.by(NotNullOrEmptyFilter.of((ExtendedRecord er) -> er.getParentCoreId())))
+              .apply("Map event occurrences verbatim to KV", verbatimTransform.toParentKv());
+
+      return KeyedPCollectionTuple.of(ConvexHullFn.tag(), convexHull())
+          .and(TemporalCoverageFn.tag(), temporalCoverage())
+          //          .and(ITERABLE_ALA_TAXON_TAG, taxonomicCoverage())
+          .and(
+              verbatimTransform.getTag(),
+              PCollectionList.of(eventOccurrenceVerbatimCollection)
+                  .and(verbatimCollection)
+                  .apply("Join event and occurrence verbatim records", Flatten.pCollections()))
+          .apply("Grouping derived metadata data", CoGroupByKey.create())
+          .apply(
+              "Creating derived metadata records",
+              DerivedMetadataTransform.builder()
+                  .convexHullTag(ConvexHullFn.tag())
+                  .temporalCoverageTag(TemporalCoverageFn.tag())
+                  .extendedRecordTag(verbatimTransform.getTag())
+                  .build()
+                  .converter());
+    }
   }
 }
