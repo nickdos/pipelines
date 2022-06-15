@@ -108,8 +108,6 @@
       // Aggregations
       {"name":"occurrenceCount","type":["null","int"],"default":null,"doc":""},
       {"name":"childEventCount","type":["null","int"],"default":null,"doc":""},
-      {"name":"measurementOrFactTypes","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"measurementOrFactMethods","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"measurementOrFactCount","type":["null","int"],"default":null,"doc":""},
       {"name":"kingdoms","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"phyla","type":{"type":"array","items":"string"},"default":[],"doc":""},

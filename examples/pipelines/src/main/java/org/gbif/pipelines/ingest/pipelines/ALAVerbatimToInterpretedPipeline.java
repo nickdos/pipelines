@@ -1,7 +1,5 @@
 package org.gbif.pipelines.ingest.pipelines;
 
-import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType.IDENTIFIER;
-import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType.IDENTIFIER_ABSENT;
 import static org.gbif.pipelines.core.utils.ModelUtils.extractOptValue;
 
 import au.org.ala.kvs.ALAPipelinesConfig;
@@ -17,7 +15,7 @@ import au.org.ala.utils.CombinedYamlConfiguration;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -33,7 +31,7 @@ import org.apache.beam.sdk.transforms.SerializableFunction;
 import org.apache.beam.sdk.transforms.View;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionView;
-import org.gbif.api.model.pipelines.StepType;
+import org.gbif.common.parsers.date.DateComponentOrdering;
 import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.pipelines.common.beam.metrics.MetricsHandler;
 import org.gbif.pipelines.common.beam.options.InterpretationPipelineOptions;
@@ -102,25 +100,21 @@ public class ALAVerbatimToInterpretedPipeline {
     Integer attempt = options.getAttempt();
     Set<String> types = options.getInterpretationTypes();
     String targetPath = options.getTargetPath();
-
-    MDC.put("datasetKey", datasetId);
-    MDC.put("step", StepType.EVENTS_VERBATIM_TO_INTERPRETED.name());
-    MDC.put("attempt", attempt.toString());
-
     HdfsConfigs hdfsConfigs =
         HdfsConfigs.create(options.getHdfsSiteConfig(), options.getCoreSiteConfig());
 
     ALAPipelinesConfig config =
         FsUtils.readConfigFile(hdfsConfigs, options.getProperties(), ALAPipelinesConfig.class);
 
-    TransformsFactory transformsFactory = TransformsFactory.create(options);
+    List<DateComponentOrdering> dateComponentOrdering =
+        options.getDefaultDateFormat() == null
+            ? config.getGbifConfig().getDefaultDateFormat()
+            : options.getDefaultDateFormat();
 
-    // Remove directories with avro files for expected interpretation, except IDENTIFIER
-    Set<String> deleteTypes = new HashSet<>(types);
-    deleteTypes.add(IDENTIFIER.name());
-    deleteTypes.remove(IDENTIFIER_ABSENT.name());
-    FsUtils.deleteInterpretIfExist(
-        hdfsConfigs, targetPath, datasetId, attempt, CORE_TERM, deleteTypes);
+    FsUtils.deleteInterpretIfExist(hdfsConfigs, targetPath, datasetId, attempt, CORE_TERM, types);
+
+    MDC.put("datasetKey", datasetId);
+    MDC.put("attempt", attempt.toString());
 
     String id = Long.toString(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC));
 
@@ -131,6 +125,8 @@ public class ALAVerbatimToInterpretedPipeline {
     Pipeline p = pipelinesFn.apply(options);
 
     // Used transforms
+    TransformsFactory transformsFactory = TransformsFactory.create(options);
+
     // Metadata
     MetadataTransform metadataTransform =
         MetadataTransform.builder()
@@ -188,7 +184,7 @@ public class ALAVerbatimToInterpretedPipeline {
 
     // view with the records that have parents to find the hierarchy in the event core
     // interpretation later
-    PCollectionView<Map<String, String>> erWithParentEventsView =
+    PCollectionView<Map<String, Map<String, String>>> erWithParentEventsView =
         uniqueRawRecords
             .apply(
                 Filter.by(
@@ -244,19 +240,11 @@ public class ALAVerbatimToInterpretedPipeline {
     result.waitUntilFinish();
 
     log.info("Save metrics into the file and set files owner");
-    String metadataPath =
-        PathBuilder.buildDatasetAttemptPath(options, options.getMetaFileName(), false);
     MetricsHandler.saveCountersToTargetPathFile(options, result.metrics());
-    FsUtils.setOwnerToCrap(hdfsConfigs, metadataPath);
 
     log.info("Deleting beam temporal folders");
     String tempPath = String.join("/", targetPath, datasetId, attempt.toString());
     FsUtils.deleteDirectoryByPrefix(hdfsConfigs, tempPath, ".temp-beam");
-
-    log.info("Set interpreted files permissions");
-    String interpretedPath =
-        PathBuilder.buildDatasetAttemptPath(options, CORE_TERM.simpleName(), false);
-    FsUtils.setOwnerToCrap(hdfsConfigs, interpretedPath);
 
     log.info("Pipeline has been finished");
   }

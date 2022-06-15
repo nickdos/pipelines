@@ -90,4 +90,8 @@ solr:
 outlier:
   inputPath: hdfs://localhost:9000/pipelines-data
   targetPath: hdfs://localhost:9000/pipelines-outlier
+elastic:
+  inputPath: hdfs://localhost:9000/pipelines-data
+  targetPath: hdfs://localhost:9000/pipelines-data
+  esSchemaPath: /Users/mar759/dev/pipelines/examples/pipelines/src/main/resources/elasticsearch/es-parent-schema.json
 

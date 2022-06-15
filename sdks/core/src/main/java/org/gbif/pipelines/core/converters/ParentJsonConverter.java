@@ -2,19 +2,33 @@ package org.gbif.pipelines.core.converters;
 
 import static org.gbif.pipelines.core.utils.ModelUtils.extractOptValue;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.pipelines.core.utils.HashConverter;
-import org.gbif.pipelines.io.avro.*;
+import org.gbif.pipelines.io.avro.DenormalisedEvent;
+import org.gbif.pipelines.io.avro.EventCoreRecord;
+import org.gbif.pipelines.io.avro.ExtendedRecord;
+import org.gbif.pipelines.io.avro.IdentifierRecord;
+import org.gbif.pipelines.io.avro.LocationRecord;
+import org.gbif.pipelines.io.avro.MeasurementOrFact;
+import org.gbif.pipelines.io.avro.MeasurementOrFactRecord;
+import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.MultimediaRecord;
+import org.gbif.pipelines.io.avro.TaxonRecord;
+import org.gbif.pipelines.io.avro.TemporalRecord;
 import org.gbif.pipelines.io.avro.grscicoll.GrscicollRecord;
 import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
 import org.gbif.pipelines.io.avro.json.EventJsonRecord;
 import org.gbif.pipelines.io.avro.json.JoinRecord;
 import org.gbif.pipelines.io.avro.json.MetadataJsonRecord;
 import org.gbif.pipelines.io.avro.json.OccurrenceJsonRecord;
+import org.gbif.pipelines.io.avro.json.Parent;
 import org.gbif.pipelines.io.avro.json.ParentJsonRecord;
 
 @Slf4j
@@ -30,10 +44,10 @@ public class ParentJsonConverter {
   private final GrscicollRecord grscicoll;
   private final MultimediaRecord multimedia;
   private final ExtendedRecord verbatim;
-  private final MeasurementOrFactRecord measurementOrFact;
   private final DenormalisedEvent denormalisedEvent;
   private final DerivedMetadataRecord derivedMetadata;
   private OccurrenceJsonRecord occurrenceJsonRecord;
+  private MeasurementOrFactRecord measurementOrFactRecord;
 
   public ParentJsonRecord convertToParent() {
     return (occurrenceJsonRecord != null) ? convertToParentOccurrence() : convertToParentEvent();
@@ -205,7 +219,7 @@ public class ParentJsonConverter {
         .setDatasetID(eventCore.getDatasetID())
         .setDatasetName(eventCore.getDatasetName())
         .setSamplingProtocol(eventCore.getSamplingProtocol())
-        .setParentEventIds(eventCore.getParentEventIds())
+        .setParentsLineage(convertParents(eventCore.getParentsLineage()))
         .setParentEventId(eventCore.getParentEventID());
 
     // Vocabulary
@@ -286,59 +300,18 @@ public class ParentJsonConverter {
         .setMediaLicenses(JsonConverter.convertMultimediaLicense(multimedia));
   }
 
-  private List<String> extractDistinctFromExtension(String extensionQualifiedName, String term) {
-    return Optional.of(verbatim.getExtensions())
-        .map(exts -> exts.get(extensionQualifiedName))
-        .map(ext -> extractDistinct(term, ext))
-        .orElse(new ArrayList<String>());
-  }
-
-  private List<String> extractDistinct(String term, List<Map<String, String>> extension) {
-    return extension.stream()
-        .map(r -> r.get(term))
-        .distinct()
-        .filter(x -> x != null)
-        .limit(100)
-        .collect(Collectors.toList());
+  private void mapMeasurementOrFactRecord(EventJsonRecord.Builder builder) {
+    builder.setMeasurementOrFactMethods(
+        measurementOrFactRecord.getMeasurementOrFactItems().stream()
+            .map(MeasurementOrFact::getMeasurementMethod)
+            .collect(Collectors.toList()));
+    builder.setMeasurementOrFactTypes(
+        measurementOrFactRecord.getMeasurementOrFactItems().stream()
+            .map(MeasurementOrFact::getMeasurementType)
+            .collect(Collectors.toList()));
   }
 
   private void mapExtendedRecord(EventJsonRecord.Builder builder) {
-
-    // set occurrence count
-    Integer occurrenceCount =
-        Optional.of(verbatim.getExtensions())
-            .map(exts -> exts.get(DwcTerm.Occurrence.qualifiedName()))
-            .map(ext -> ext.size())
-            .orElse(0);
-
-    builder.setOccurrenceCount(occurrenceCount);
-
-    List<String> kingdoms =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.kingdom.qualifiedName());
-    List<String> phyla =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.phylum.qualifiedName());
-    List<String> classes =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.class_.qualifiedName());
-    List<String> orders =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.order.qualifiedName());
-    List<String> families =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.family.qualifiedName());
-    List<String> genera =
-        extractDistinctFromExtension(
-            DwcTerm.Occurrence.qualifiedName(), DwcTerm.genus.qualifiedName());
-
-    builder.setKingdoms(kingdoms);
-    builder.setPhyla(phyla);
-    builder.setOrders(orders);
-    builder.setClasses(classes);
-    builder.setFamilies(families);
-    builder.setGenera(genera);
-
     builder.setExtensions(JsonConverter.convertExtensions(verbatim));
 
     // Set raw as indexed
@@ -348,29 +321,6 @@ public class ParentJsonConverter {
     extractOptValue(verbatim, DwcTerm.verbatimDepth).ifPresent(builder::setVerbatimDepth);
     extractOptValue(verbatim, DwcTerm.verbatimElevation).ifPresent(builder::setVerbatimElevation);
     extractOptValue(verbatim, DwcTerm.locationID).ifPresent(builder::setLocationID);
-  }
-
-  private void mapMeasurementOrFactRecord(EventJsonRecord.Builder builder) {
-    if (measurementOrFact != null) {
-
-      List<String> methods =
-          measurementOrFact.getMeasurementOrFactItems().stream()
-              .map(mof -> mof.getMeasurementMethod())
-              .filter(s -> Objects.nonNull(s))
-              .distinct()
-              .collect(Collectors.toList());
-
-      List<String> types =
-          measurementOrFact.getMeasurementOrFactItems().stream()
-              .map(mof -> mof.getMeasurementType())
-              .filter(s -> Objects.nonNull(s))
-              .distinct()
-              .collect(Collectors.toList());
-
-      builder.setMeasurementOrFactMethods(methods);
-      builder.setMeasurementOrFactTypes(types);
-      builder.setMeasurementOrFactCount(measurementOrFact.getMeasurementOrFactItems().size());
-    }
   }
 
   private void mapIssues(EventJsonRecord.Builder builder) {
@@ -387,5 +337,15 @@ public class ParentJsonConverter {
 
   private void mapDerivedMetadata(ParentJsonRecord.Builder builder) {
     builder.setDerivedMetadata(derivedMetadata);
+  }
+
+  protected static List<Parent> convertParents(List<org.gbif.pipelines.io.avro.Parent> parents) {
+    if (parents == null) {
+      return Collections.emptyList();
+    }
+
+    return parents.stream()
+        .map(p -> Parent.newBuilder().setId(p.getId()).setEventType(p.getEventType()).build())
+        .collect(Collectors.toList());
   }
 }
