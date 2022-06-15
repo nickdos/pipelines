@@ -576,15 +576,15 @@ function elastic-event () {
     SECONDS=0
     logStepStart "ElasticEvent" $dr
 
-    SH_ARGS=interpret-sh-args.local
+    SH_ARGS=elastic-sh-args.local
     CLASS=au.org.ala.pipelines.beam.ALAEventToEsIndexPipeline
     java-pipeline $ltype $SH_ARGS $CLASS $dr
 
-    SH_ARGS=interpret-sh-args.spark-embedded
+    SH_ARGS=elastic-sh-args.spark-embedded
     CLASS=au.org.ala.pipelines.beam.ALAEventToEsIndexPipeline
     spark-embed-pipeline $ltype $SH_ARGS $CLASS $dr
 
-    SH_ARGS=interpret-sh-args.spark-cluster
+    SH_ARGS=elastic-sh-args.spark-cluster
     spark-cluster-pipeline $ltype $SH_ARGS $CLASS $dr "elastic-event $dr"
 
     logStepEnd "EventElastic" $dr $ltype $SECONDS
