@@ -53,8 +53,8 @@
       // Event
       {"name":"samplingProtocol","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"samplingProtocolJoined","type":["null","string"],"default":null,"doc":""},
-      {"name":"eventId","type":["null","string"],"default":null,"doc":""},
-      {"name":"parentEventId","type":["null","string"],"default":null,"doc":""},
+      {"name":"eventID","type":["null","string"],"default":null,"doc":""},
+      {"name":"parentEventID","type":["null","string"],"default":null,"doc":""},
       {"name":"sampleSizeUnit","type":["null","string"],"default":null,"doc":""},
       {"name":"sampleSizeValue","type":["null","double"],"default":null,"doc":""},
       {"name":"year","type":["null","int"],"default":null,"doc":""},
@@ -91,7 +91,7 @@
       {"name":"repatriated","type":["null","boolean"],"default":null,"doc":""},
       {"name":"hasGeospatialIssue","type":["null","boolean"],"default":null,"doc":""},
       {"name":"footprintWKT","type":["null","string"],"default":null,"doc":""},
-      //Taxonomy
+      // Taxonomy
       {"name":"gbifClassification","type":["null","GbifClassification"],"default":null,"doc":""},
       // Multimedia
       {"name":"mediaTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
