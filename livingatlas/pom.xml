@@ -24,6 +24,7 @@
     <module>migration</module>
     <module>bitmap</module>
     <module>tree-denorm</module>
+    <module>downloads</module>
   </modules>
 
 </project>

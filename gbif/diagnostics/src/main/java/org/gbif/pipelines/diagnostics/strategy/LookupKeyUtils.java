@@ -13,7 +13,9 @@ public class LookupKeyUtils {
   public static Optional<Long> getKey(HBaseLockingKeyService service, String lookupKey) {
     Optional<Long> tripletKey = Optional.empty();
     if (lookupKey != null && !lookupKey.isEmpty()) {
-      tripletKey = service.findKey(Collections.singleton(lookupKey)).map(KeyLookupResult::getKey);
+      tripletKey =
+          Optional.ofNullable(service.findKey(Collections.singleton(lookupKey)))
+              .map(KeyLookupResult::getKey);
     }
     return tripletKey;
   }

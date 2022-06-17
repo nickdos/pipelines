@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
@@ -48,7 +47,7 @@ import org.gbif.pipelines.keygen.identifier.OccurrenceKeyBuilder;
 @Slf4j
 public class HBaseLockingKeyService implements HBaseLockingKey, Serializable {
 
-  private static final long serialVersionUID = -3128096563237268387L;
+  private static final long serialVersionUID = -3128096563237268386L;
 
   private static final long WAIT_BEFORE_RETRY_MS = 250; // wait when collision
   private static final int WAIT_SKEW = 100; // randomises wait to reduce races
@@ -242,7 +241,12 @@ public class HBaseLockingKeyService implements HBaseLockingKey, Serializable {
     // write the key and update status to ALLOCATED
     for (Map.Entry<String, KeyStatus> entry : statusMap.entrySet()) {
       if (entry.getValue() == KeyStatus.ALLOCATING) {
-        putKey(entry.getKey(), key);
+        lookupTableStore.putLongString(
+            entry.getKey(),
+            Columns.LOOKUP_KEY_COLUMN,
+            key,
+            Columns.LOOKUP_STATUS_COLUMN,
+            KeyStatus.ALLOCATED.toString());
       }
     }
 
@@ -283,11 +287,11 @@ public class HBaseLockingKeyService implements HBaseLockingKey, Serializable {
   }
 
   @Override
-  public Optional<KeyLookupResult> findKey(Set<String> uniqueStrings, String scope) {
+  public KeyLookupResult findKey(Set<String> uniqueStrings, String scope) {
     checkNotNull(uniqueStrings, "uniqueStrings can't be null");
     checkNotNull(scope, "scope can't be null");
     if (uniqueStrings.isEmpty()) {
-      return Optional.empty();
+      return null;
     }
 
     Set<String> lookupKeys = OccurrenceKeyBuilder.buildKeys(uniqueStrings, scope);
@@ -331,10 +335,11 @@ public class HBaseLockingKeyService implements HBaseLockingKey, Serializable {
       result = new KeyLookupResult(resultKey, false);
     }
 
-    return Optional.ofNullable(result);
+    return result;
   }
 
-  public Optional<KeyLookupResult> findKey(Set<String> uniqueStrings) {
+  @Override
+  public KeyLookupResult findKey(Set<String> uniqueStrings) {
     return findKey(uniqueStrings, datasetId);
   }
 
@@ -448,15 +453,6 @@ public class HBaseLockingKeyService implements HBaseLockingKey, Serializable {
   public void deleteKeyByUniques(Set<String> uniqueStrings) {
     deleteKeyByUniques(uniqueStrings, datasetId);
     log.info("Lookup keys deleted: {}", String.join(",", uniqueStrings));
-  }
-
-  public void putKey(String lookupKey, long gbifId) {
-    lookupTableStore.putLongString(
-        lookupKey,
-        Columns.LOOKUP_KEY_COLUMN,
-        gbifId,
-        Columns.LOOKUP_STATUS_COLUMN,
-        KeyStatus.ALLOCATED.toString());
   }
 
   @SneakyThrows
