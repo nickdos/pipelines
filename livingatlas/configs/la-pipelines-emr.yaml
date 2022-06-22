@@ -93,6 +93,11 @@ outlier:
   targetPath: hdfs:///pipelines-outlier
   allDatasetsInputPath: hdfs:////pipelines-all-datasets
 
+elastic:
+  inputPath: hdfs:///pipelines-data
+  targetPath: hdfs:///pipelines-data
+  esSchemaPath: /tmp/es-event-core-schema.json
+
 gbifConfig:
   vocabularyConfig:
     vocabulariesPath: /data/pipelines-vocabularies/

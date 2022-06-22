@@ -1119,43 +1119,43 @@
               "type": "text"
             },
             "kingdomKey": {
-              "type": "long"
+              "type": "text"
             },
             "phylum": {
               "type": "text"
             },
             "phylumKey": {
-              "type": "long"
+              "type": "text"
             },
             "class": {
               "type": "text"
             },
             "classKey": {
-              "type": "long"
+              "type": "text"
             },
             "order": {
               "type": "text"
             },
             "orderKey": {
-              "type": "long"
+              "type": "text"
             },
             "family": {
               "type": "text"
             },
             "familyKey": {
-              "type": "long"
+              "type": "text"
             },
             "genus": {
               "type": "text"
             },
             "genusKey": {
-              "type": "long"
+              "type": "text"
             },
             "species": {
               "type": "text"
             },
             "speciesKey": {
-              "type": "long"
+              "type": "text"
             },
             "synonym": {
               "type": "boolean"
@@ -1164,12 +1164,12 @@
               "type": "keyword"
             },
             "taxonKey": {
-              "type": "long"
+              "type": "text"
             },
             "usage": {
               "properties": {
                 "key": {
-                  "type": "long"
+                  "type": "text"
                 },
                 "name": {
                   "type": "keyword",

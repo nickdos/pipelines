@@ -1,20 +1,24 @@
 package org.gbif.pipelines.events
 import org.apache.commons.io.FileUtils
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{StringType, StructType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 
-import java.io.File
+import java.io.{BufferedInputStream, File, FileInputStream, FileOutputStream}
+import java.net.{URI, URL}
 import java.util
 import java.util.UUID
+import java.util.zip.{ZipEntry, ZipOutputStream}
 import scala.xml.Elem
 
 /**
  * Pipeline uses Spark SQL to produce a DwCA Archive.
  */
-object DownloadPipeline {
+object DownloadDwCAPipeline {
 
   val workingDirectory = "/tmp/pipelines-export/"
 
@@ -66,17 +70,22 @@ object DownloadPipeline {
   def main(args: Array[String]): Unit = {
 
     if (args.length < 3) {
-      println("Please supply <DatasetId> <HDFS_BasePath> <Attempt>")
-      println("e.g. dr18391 hdfs://localhost:9000/pipelines-data 1")
+      println("Please supply <DatasetId> <HDFS_BasePath> <Attempt> <JobID>")
+      println("e.g. dr18391 hdfs://localhost:9000/pipelines-data 1 job-123")
       return;
     }
 
-    val datasetId = "dr18391"
-    val hdfsPath = "hdfs://localhost:9000/pipelines-data"
-    val attempt = "1"
+    val datasetId = args(0)
+    val hdfsPath = args(1)
+    val attempt = args(2)
+    val jobID = if (args.length > 3 && args(3) != null && args(3) != "generate") {
+      args(3)
+    } else {
+      UUID.randomUUID.toString
+    }
 
-    val localTest = if (args.length > 3) {
-      args(3).toBoolean
+    val localTest = if (args.length == 5) {
+      args(4).toBoolean
     } else {
       false
     }
@@ -98,6 +107,7 @@ object DownloadPipeline {
     }
 
     spark.sparkContext.setLogLevel("ERROR")
+    spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
 
     System.out.println("Load events")
     val eventCoreDF = spark.read.format("avro").
@@ -124,10 +134,19 @@ object DownloadPipeline {
       join(temporalDF, col("core.id") === col("temporal.id"), "inner").
       join(verbatimDF, col("core.id") === col("verbatim.id"), "inner")
 
-    val uuid = UUID.randomUUID().toString
-
     // get a list columns
-    val exportPath = workingDirectory + uuid + s"/${coreTermTypeSimple}/"
+    val exportPath = workingDirectory + jobID + s"/${coreTermTypeSimple}/"
+
+
+//    import org.apache.spark.sql.functions._
+//
+//    val stringify = udf((vs: Seq[String]) => vs match {
+//      case null => null
+//      case _    => s"""[${vs.mkString(",")}]"""
+//    })
+//
+//    filterDownloadDF.withColumn("ArrayOfString", stringify($"ArrayOfString")).write.csv(...)
+
 
     // filter "coreTerms", "extensions"
     filterDownloadDF.select(generateFieldColumns(FIELDS):_*).coalesce(1).write
@@ -135,11 +154,12 @@ object DownloadPipeline {
       .option("sep","\t")
       .mode("overwrite")
       .csv(exportPath)
-    cleanupFileExport(uuid, coreTermTypeSimple)
+
+    cleanupFileExport(jobID, coreTermTypeSimple)
 
     val extensionsForMeta = new util.HashMap[String, Array[String]]
 
-    //get list of extensions for this dataset
+    // get list of extensions for this dataset
     val extensionList = getExtensionList(filterDownloadDF, spark)
 
     extensionList.foreach(extensionURI => {
@@ -148,7 +168,7 @@ object DownloadPipeline {
 
       val arrayStructureSchema = {
         var builder = new StructType().add("id", StringType)
-        extensionFields.foreach(fieldName => {
+        extensionFields.foreach { fieldName =>
           val isURI = fieldName.lastIndexOf("/") > 0
           val simpleName = if (isURI){
             fieldName.substring(fieldName.lastIndexOf("/") + 1)
@@ -156,7 +176,7 @@ object DownloadPipeline {
             fieldName
           }
           builder = builder.add(simpleName, StringType)
-        })
+        }
         builder
       }
 
@@ -175,16 +195,39 @@ object DownloadPipeline {
         .option("header","true")
         .option("sep","\t")
         .mode("overwrite")
-        .csv(workingDirectory + uuid + "/" + extensionSimpleName)
+        .csv(workingDirectory + jobID + "/" + extensionSimpleName)
 
-      cleanupFileExport(uuid, extensionSimpleName)
+      cleanupFileExport(jobID, extensionSimpleName)
       extensionsForMeta.put(extensionURI, extensionFields)
     })
 
     // write the XML
     import scala.collection.JavaConversions._
     val metaXml = createMeta(coreTermType, FIELDS, extensionsForMeta.toMap)
-    scala.xml.XML.save(workingDirectory + uuid + "/meta.xml", metaXml)
+    scala.xml.XML.save(workingDirectory + jobID + "/meta.xml", metaXml)
+
+    // get EML doc
+    import sys.process._
+    new URL(s"https://collections-test.ala.org.au/ws/eml/${datasetId}") #> new File(workingDirectory + jobID + "/eml.xml") !!
+
+    // create a zip
+    val zip = new ZipOutputStream(new FileOutputStream(new File(workingDirectory + jobID + "/" + datasetId + ".zip")))
+    new File(workingDirectory + jobID + "/").listFiles().foreach { file =>
+
+      if (!file.getName.endsWith(datasetId + ".zip")) {
+        println("Zipping " + file.getName)
+        zip.putNextEntry(new ZipEntry(file.getName))
+        val in = new BufferedInputStream(new FileInputStream(file))
+        Stream.continually(in.read()).takeWhile(_ > -1).foreach { b => zip.write(b) }
+        in.close()
+        zip.flush()
+        zip.closeEntry()
+      }
+    }
+    zip.flush()
+    zip.close()
+
+    println("Export complete")
   }
 
   def generateFieldColumns(fields:Seq[String]): Seq[Column] = {
@@ -209,21 +252,42 @@ object DownloadPipeline {
     }
   }
 
-  private def cleanupFileExport(uuid: String, extensionSimpleName: String) = {
+  private def cleanupFileExport(jobID: String, extensionSimpleName: String) = {
+
+    val localFile = new File(workingDirectory + jobID + "/" + extensionSimpleName)
+
+    if (localFile.exists()){
+      println("Local file exists = " + localFile.getPath)
+    } else {
+      val hdfsSiteConf = "/etc/hadoop/conf/hdfs-site.xml"
+      val coreSiteConf = "/etc/hadoop/conf/core-site.xml"
+      val conf = new Configuration
+      conf.addResource(new File(hdfsSiteConf).toURI().toURL())
+      conf.addResource(new File(coreSiteConf).toURI().toURL())
+      val hdfsPrefixToUse = conf.get("fs.defaultFS")
+      val hdfsFs = FileSystem.get(URI.create(hdfsPrefixToUse), conf)
+
+      println("trying to copy to Local = " + localFile.getPath)
+      // copy to local file system
+      hdfsFs.copyToLocalFile(new Path(hdfsPrefixToUse + workingDirectory + jobID + "/" + extensionSimpleName), new Path(workingDirectory + jobID + "/" + extensionSimpleName))
+    }
+
     // move part-* file to {extension_name}.txt
-    val file = new File(workingDirectory + uuid + "/" + extensionSimpleName)
-    val outputFile = file.listFiles.filter(_.isFile)
+    println("Cleaning up extension " + extensionSimpleName)
+
+    val file = new File(workingDirectory + jobID + "/" + extensionSimpleName)
+    val outputFile = file.listFiles.filter(exportFile => exportFile != null && exportFile.isFile)
       .filter(_.getName.startsWith("part-"))
       .map(_.getPath).toList.head
 
     // move to sensible name
     FileUtils.moveFile(
       new File(outputFile),
-      new File(workingDirectory + uuid + "/" + extensionSimpleName.toLowerCase() + ".txt")
+      new File(workingDirectory + jobID + "/" + extensionSimpleName.toLowerCase() + ".txt")
     )
 
     // remote temporary directory
-    FileUtils.forceDelete(new File(workingDirectory + uuid + "/" + extensionSimpleName))
+    FileUtils.forceDelete(new File(workingDirectory + jobID + "/" + extensionSimpleName))
   }
 
   def generateExtension(extensionUri:String, extensionFields:Array[String]) : Elem = {
