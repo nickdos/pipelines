@@ -8,7 +8,7 @@ import org.gbif.dwc.terms.Term;
 
 import java.util.Map;
 
-public class EventQueryVisitor extends SparkSQLQueryVisitor {
+public class EventSparkQueryVisitor extends SparkQueryVisitor {
 
     private final static Map<SearchParameter, ? extends Term> PARAMS_TO_TERMS = ImmutableMap.<SearchParameter, Term>builder()
                     .put(EventSearchParameter.STATE_PROVINCE, DwcTerm.stateProvince)

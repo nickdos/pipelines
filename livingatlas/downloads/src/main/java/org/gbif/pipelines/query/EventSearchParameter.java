@@ -1,8 +1,10 @@
 package org.gbif.pipelines.query;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.gbif.api.model.common.search.SearchParameter;
 import java.util.Date;
 
+@JsonDeserialize(as = EventSearchParameter.class)
 public enum EventSearchParameter implements SearchParameter {
 
     STATE_PROVINCE(String.class),

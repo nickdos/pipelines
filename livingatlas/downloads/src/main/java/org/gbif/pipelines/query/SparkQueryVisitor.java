@@ -26,9 +26,9 @@ import org.slf4j.LoggerFactory;
 
 import static org.gbif.api.util.IsoDateParsingUtils.ISO_DATE_FORMATTER;
 
-public abstract class SparkSQLQueryVisitor {
+public abstract class SparkQueryVisitor implements QueryVisitor {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SparkSQLQueryVisitor.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SparkQueryVisitor.class);
     private static final String CONJUNCTION_OPERATOR = " AND ";
     private static final String DISJUNCTION_OPERATOR = " OR ";
     private static final String EQUALS_OPERATOR = " = ";
@@ -125,7 +125,7 @@ public abstract class SparkSQLQueryVisitor {
      *
      * @return WHERE clause
      */
-    public String getSparkSQLQuery(Predicate predicate) throws QueryBuildingException {
+    public String buildQuery(Predicate predicate) throws QueryBuildingException {
         String query = ALL_QUERY;
         if (predicate != null) { // null predicate means a SELECT ALL
             builder = new StringBuilder();
