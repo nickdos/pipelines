@@ -1,4 +1,5 @@
 package org.gbif.pipelines.events
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -7,6 +8,9 @@ import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{StringType, StructType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
+import org.gbif.api.model.common.search.SearchParameter
+import org.gbif.api.model.predicate.Predicate
+import org.gbif.predicate.query.{EventSearchParameter, EventSparkQueryVisitor}
 
 import java.io.{BufferedInputStream, File, FileInputStream, FileOutputStream}
 import java.net.{URI, URL}
@@ -69,25 +73,33 @@ object DownloadDwCAPipeline {
   // Test with some sample data
   def main(args: Array[String]): Unit = {
 
-    if (args.length < 3) {
-      println("Please supply <DatasetId> <HDFS_BasePath> <Attempt> <JobID>")
-      println("e.g. dr18391 hdfs://localhost:9000/pipelines-data 1 job-123")
+    if (args.length == 3) {
+      println("Please supply <DatasetId> <HDFS_BasePath> <Attempt> <JobID> <LocalSpark> <PredicateQuery>")
+      println("e.g. dr18391 hdfs://localhost:9000/pipelines-data 1 job-123 false {}")
       return;
     }
 
     val datasetId = args(0)
     val hdfsPath = args(1)
     val attempt = args(2)
-    val jobID = if (args.length > 3 && args(3) != null && args(3) != "generate") {
+    val jobID = if (args(3) != "generate") {
       args(3)
     } else {
       UUID.randomUUID.toString
     }
+    val localTest = args(4).toBoolean
+    val predicateQueryJSON = args(5)
 
-    val localTest = if (args.length == 5) {
-      args(4).toBoolean
+
+    val queryFilter = if (predicateQueryJSON != "{}"){
+      val om = new ObjectMapper();
+      val unescaped = predicateQueryJSON.replaceAll("\\\\", "")
+      om.addMixIn(classOf[SearchParameter], classOf[EventSearchParameter]);
+      val predicate = om.readValue(unescaped, classOf[Predicate]);
+      val v = new EventSparkQueryVisitor();
+      v.buildQuery(predicate);
     } else {
-      false
+      ""
     }
 
     // Mask log
@@ -111,28 +123,32 @@ object DownloadDwCAPipeline {
 
     System.out.println("Load events")
     val eventCoreDF = spark.read.format("avro").
-      load(s"${hdfsPath}/${datasetId}/${attempt}/event/event_core/*.avro").as("core")
+      load(s"${hdfsPath}/${datasetId}/${attempt}/event/event_core/*.avro").as("Core")
 
     System.out.println("Load location")
     val locationDF = spark.read.format("avro").
-      load(s"${hdfsPath}/${datasetId}/${attempt}/event/location/*.avro").as("location")
+      load(s"${hdfsPath}/${datasetId}/${attempt}/event/location/*.avro").as("Location")
 
     System.out.println("Load temporal")
     val temporalDF = spark.read.format("avro").
-      load(s"${hdfsPath}/${datasetId}/${attempt}/event/temporal/*.avro").as("temporal")
+      load(s"${hdfsPath}/${datasetId}/${attempt}/event/temporal/*.avro").as("Temporal")
+
+    System.out.println("Load denorm")
+    val denormDF = spark.read.format("avro").
+      load(s"${hdfsPath}/${datasetId}/${attempt}/event/event_hierarchy/*.avro").as("Denorm")
 
     System.out.println("Load verbatim")
     val verbatimDF = spark.read.format("avro").
-      load(s"${hdfsPath}/${datasetId}/${attempt}/verbatim.avro").as("verbatim")
+      load(s"${hdfsPath}/${datasetId}/${attempt}/verbatim.avro").as("Verbatim")
 
     val coreTermType = verbatimDF.select(col("coreRowType")).distinct.head.get(0).asInstanceOf[String]
     val coreTermTypeSimple = coreTermType.substring(coreTermType.lastIndexOf("/") + 1)
 
     System.out.println("Join")
-    val filterDownloadDF = eventCoreDF.
-      join(locationDF, col("core.id") === col("location.id"), "inner").
-      join(temporalDF, col("core.id") === col("temporal.id"), "inner").
-      join(verbatimDF, col("core.id") === col("verbatim.id"), "inner")
+    val downloadDF = eventCoreDF.
+      join(locationDF, col("Core.id") === col("Location.id"), "inner").
+      join(temporalDF, col("Core.id") === col("Temporal.id"), "inner").
+      join(denormDF, col("Core.id") === col("Denorm.id"), "inner")
 
     // get a list columns
     val exportPath = workingDirectory + jobID + s"/${coreTermTypeSimple}/"
@@ -147,8 +163,13 @@ object DownloadDwCAPipeline {
 //
 //    filterDownloadDF.withColumn("ArrayOfString", stringify($"ArrayOfString")).write.csv(...)
 
+    val filterDownloadDF = if (queryFilter != ""){
+      // filter "coreTerms", "extensions"
+      downloadDF.filter(queryFilter)
+    } else {
+      downloadDF
+    }
 
-    // filter "coreTerms", "extensions"
     filterDownloadDF.select(generateFieldColumns(FIELDS):_*).coalesce(1).write
       .option("header","true")
       .option("sep","\t")
@@ -157,14 +178,17 @@ object DownloadDwCAPipeline {
 
     cleanupFileExport(jobID, coreTermTypeSimple)
 
+    val dfWithExtensions = filterDownloadDF.
+      join(verbatimDF, col("Core.id") === col("Verbatim.id"), "inner")
+
     val extensionsForMeta = new util.HashMap[String, Array[String]]
 
     // get list of extensions for this dataset
-    val extensionList = getExtensionList(filterDownloadDF, spark)
+    val extensionList = getExtensionList(dfWithExtensions, spark)
 
     extensionList.foreach(extensionURI => {
 
-      val extensionFields = getExtensionFields(filterDownloadDF, extensionURI, spark)
+      val extensionFields = getExtensionFields(dfWithExtensions, extensionURI, spark)
 
       val arrayStructureSchema = {
         var builder = new StructType().add("id", StringType)
@@ -180,8 +204,8 @@ object DownloadDwCAPipeline {
         builder
       }
 
-      val extensionDF = filterDownloadDF.select(
-        col("core.id").as("id"),
+      val extensionDF = dfWithExtensions.select(
+        col("Core.id").as("id"),
         col(s"""extensions.`${extensionURI}`""").as("the_extension")
       ).toDF
       val rowRDD = extensionDF.rdd.map(row => genericRecordToRow(row, extensionFields, arrayStructureSchema)).flatMap(list => list)
@@ -232,7 +256,7 @@ object DownloadDwCAPipeline {
 
   def generateFieldColumns(fields:Seq[String]): Seq[Column] = {
     fields.map {
-      case "core.id" => col("core.id").as("eventID")
+      case "Core.id" => col("Core.id").as("eventID")
       case "eventDate.gte" => col("eventDate.gte").as("eventDate")
       case "eventType.concept"=> col("eventType.concept").as("/eventType")
       case x => {
@@ -243,7 +267,7 @@ object DownloadDwCAPipeline {
 
   def generateCoreFieldMetaName(field:String): String = {
     field match {
-      case "core.id" => "http://rs.tdwg.org/dwc/terms/eventID"
+      case "Core.id" => "http://rs.tdwg.org/dwc/terms/eventID"
       case "eventDate.gte" => "http://rs.tdwg.org/dwc/terms/eventDate"
       case "eventType.concept" => "http://rs.gbif.org/terms/1.0/eventType"
       case "elevationAccuracy" => "http://rs.gbif.org/terms/1.0/elevationAccuracy"
