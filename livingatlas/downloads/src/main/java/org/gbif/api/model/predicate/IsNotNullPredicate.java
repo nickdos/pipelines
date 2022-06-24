@@ -15,21 +15,17 @@
  */
 package org.gbif.api.model.predicate;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Objects;
+import java.util.StringJoiner;
+import javax.validation.constraints.NotNull;
 import org.gbif.api.model.common.search.SearchParameter;
 import org.gbif.api.model.occurrence.search.OccurrenceSearchParameter;
 
-import java.util.Objects;
-import java.util.StringJoiner;
-
-import javax.validation.constraints.NotNull;
-
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 public class IsNotNullPredicate implements Predicate {
 
-  @NotNull
-  private final SearchParameter parameter;
+  @NotNull private final SearchParameter parameter;
 
   @JsonCreator
   public IsNotNullPredicate(@JsonProperty("parameter") SearchParameter parameter) {
@@ -42,12 +38,11 @@ public class IsNotNullPredicate implements Predicate {
     return parameter;
   }
 
-  /**
-   * @throws IllegalArgumentException if the key SearchParameter is Geometry
-   */
+  /** @throws IllegalArgumentException if the key SearchParameter is Geometry */
   private void checkPredicateAllowed() {
     if (OccurrenceSearchParameter.GEOMETRY == parameter) {
-      throw new IllegalArgumentException("IsNotNull predicate is not supported for Geometry parameter");
+      throw new IllegalArgumentException(
+          "IsNotNull predicate is not supported for Geometry parameter");
     }
   }
 
@@ -71,7 +66,7 @@ public class IsNotNullPredicate implements Predicate {
   @Override
   public String toString() {
     return new StringJoiner(", ", IsNotNullPredicate.class.getSimpleName() + "[", "]")
-      .add("parameter=" + parameter)
-      .toString();
+        .add("parameter=" + parameter)
+        .toString();
   }
 }

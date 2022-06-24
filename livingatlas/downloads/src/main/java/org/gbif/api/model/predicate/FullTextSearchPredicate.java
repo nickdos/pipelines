@@ -13,34 +13,29 @@
  */
 package org.gbif.api.model.predicate;
 
-import org.gbif.api.util.PreconditionUtils;
-
-import java.util.Objects;
-import java.util.StringJoiner;
-
-import javax.validation.constraints.NotNull;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Objects;
+import java.util.StringJoiner;
+import javax.validation.constraints.NotNull;
+import org.gbif.api.util.PreconditionUtils;
 
 /**
- * This predicate checks performs a full text search based on a query parameter.
- * Not all predicate back-ends support this predicate.
+ * This predicate checks performs a full text search based on a query parameter. Not all predicate
+ * back-ends support this predicate.
  */
 public class FullTextSearchPredicate implements Predicate {
 
-  @NotNull
-  private final String q;
+  @NotNull private final String q;
 
   @JsonCreator
   public FullTextSearchPredicate(@NotNull @JsonProperty("key") String q) {
-    PreconditionUtils.checkArgument( q != null && !q.trim().isEmpty(), "Query parameter can't be null or empty");
+    PreconditionUtils.checkArgument(
+        q != null && !q.trim().isEmpty(), "Query parameter can't be null or empty");
     this.q = q.trim();
   }
 
-  /**
-   * Text query parameter.
-   */
+  /** Text query parameter. */
   public String getQ() {
     return q;
   }
@@ -65,7 +60,7 @@ public class FullTextSearchPredicate implements Predicate {
   @Override
   public String toString() {
     return new StringJoiner(", ", FullTextSearchPredicate.class.getSimpleName() + "[", "]")
-      .add("q=" + q)
-      .toString();
+        .add("q=" + q)
+        .toString();
   }
 }

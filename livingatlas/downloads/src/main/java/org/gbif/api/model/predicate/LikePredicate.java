@@ -15,29 +15,28 @@
  */
 package org.gbif.api.model.predicate;
 
-import org.gbif.api.model.common.search.SearchParameter;
-
-import javax.annotation.Nullable;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.annotation.Nullable;
+import org.gbif.api.model.common.search.SearchParameter;
 
 /**
- * This predicate checks if its {@code key} is LIKE its {@code value}.
- * The syntax for one <code>?</code> or any <code>*</code> arbitrary matching characters
- * is the one used by ElasticSearch, Unix/DOS shells, etc.
+ * This predicate checks if its {@code key} is LIKE its {@code value}. The syntax for one <code>?
+ * </code> or any <code>*</code> arbitrary matching characters is the one used by ElasticSearch,
+ * Unix/DOS shells, etc.
  */
 public class LikePredicate extends SimplePredicate {
 
   @JsonCreator
   public LikePredicate(
-    @JsonProperty("key") SearchParameter key,
-    @JsonProperty("value") String value,
-    @Nullable @JsonProperty(value = "matchCase") Boolean matchCase) {
+      @JsonProperty("key") SearchParameter key,
+      @JsonProperty("value") String value,
+      @Nullable @JsonProperty(value = "matchCase") Boolean matchCase) {
     super(false, key, value, matchCase);
     // make sure we deal with a String type
     if (!String.class.equals(key.type())) {
-      throw new IllegalArgumentException("Like comparisons are only allowed for strings but not parameter " + key);
+      throw new IllegalArgumentException(
+          "Like comparisons are only allowed for strings but not parameter " + key);
     }
   }
 }

@@ -13,15 +13,11 @@
  */
 package org.gbif.api.model.predicate;
 
-import java.io.Serializable;
-
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import java.io.Serializable;
 
-@JsonTypeInfo(
-  use = JsonTypeInfo.Id.NAME,
-  property = "type"
-)
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes({
   @JsonSubTypes.Type(value = ConjunctionPredicate.class, name = "and"),
   @JsonSubTypes.Type(value = DisjunctionPredicate.class, name = "or"),
@@ -39,5 +35,4 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
   @JsonSubTypes.Type(value = IsNullPredicate.class, name = "isNull"),
   @JsonSubTypes.Type(value = FullTextSearchPredicate.class, name = "fullTextSearchPredicate")
 })
-public interface Predicate extends Serializable {
-}
+public interface Predicate extends Serializable {}

@@ -7,24 +7,24 @@ import org.junit.Test;
 
 public class OccurrenceQueryVisitorTest {
 
-    @Test
-    public void testOccurrenceQueryFromJSON() throws Exception {
+  @Test
+  public void testOccurrenceQueryFromJSON() throws Exception {
 
-        String json =
-                "{\"type\":\"and\"," +
-                "\"predicates\":[" +
-                        "{" +
-                            "\"type\":\"in\"," +
-                            "\"key\":\"STATE_PROVINCE\",\"values\":[\"new south wales\"]," +
-                            "\"matchCase\":false" +
-                        "}" +
-                    "]" +
-                "}";
-        ObjectMapper om = new ObjectMapper();
-        om.addMixIn(SearchParameter.class, OccurrenceSearchParameter.class);
-        Predicate predicate = om.readValue(json, Predicate.class);
-        QueryVisitor v = new OccurrenceSparkQueryVisitor();
-        String queryString = v.buildQuery(predicate);
-        System.out.println(queryString);
-    }
+    String json =
+        "{\"type\":\"and\","
+            + "\"predicates\":["
+            + "{"
+            + "\"type\":\"in\","
+            + "\"key\":\"STATE_PROVINCE\",\"values\":[\"new south wales\"],"
+            + "\"matchCase\":false"
+            + "}"
+            + "]"
+            + "}";
+    ObjectMapper om = new ObjectMapper();
+    om.addMixIn(SearchParameter.class, OccurrenceSearchParameter.class);
+    Predicate predicate = om.readValue(json, Predicate.class);
+    QueryVisitor v = new OccurrenceSparkQueryVisitor();
+    String queryString = v.buildQuery(predicate);
+    System.out.println(queryString);
+  }
 }

@@ -15,46 +15,44 @@
  */
 package org.gbif.api.model.predicate;
 
-import org.gbif.api.model.occurrence.search.OccurrenceSearchParameter;
-import org.gbif.api.util.SearchTypeValidator;
-
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 import java.util.StringJoiner;
-
 import javax.validation.constraints.NotNull;
-
+import org.gbif.api.model.occurrence.search.OccurrenceSearchParameter;
+import org.gbif.api.util.SearchTypeValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 /**
- * This predicate checks if an occurrence location falls within the given WKT geometry {@code value}.
+ * This predicate checks if an occurrence location falls within the given WKT geometry {@code
+ * value}.
  */
 public class WithinPredicate implements Predicate {
 
   private static final Logger LOG = LoggerFactory.getLogger(WithinPredicate.class);
 
-  @NotNull
-  private final String geometry;
+  @NotNull private final String geometry;
 
   /**
-   * Builds a new within predicate for a single, simple geometry as
-   * <a href="http://en.wikipedia.org/wiki/Well-known_text">Well Known Text</a> (WKT).
-   * Multi geometries like MULTIPOLYGON are not supported and multiple predicates should be used instead.
-   * <br/>
-   * The validation implemented does a basic syntax check for the following simple geometries, but does not
-   * verify that the resulting geometries are topologically valid (see the OGC SFS specification).
+   * Builds a new within predicate for a single, simple geometry as <a
+   * href="http://en.wikipedia.org/wiki/Well-known_text">Well Known Text</a> (WKT). Multi geometries
+   * like MULTIPOLYGON are not supported and multiple predicates should be used instead. <br>
+   * The validation implemented does a basic syntax check for the following simple geometries, but
+   * does not verify that the resulting geometries are topologically valid (see the OGC SFS
+   * specification).
+   *
    * <ul>
-   *   <li>POINT</li>
-   *   <li>LINESTRING</li>
-   *   <li>POLYGON</li>
-   *   <li>LINEARRING</li>
+   *   <li>POINT
+   *   <li>LINESTRING
+   *   <li>POLYGON
+   *   <li>LINEARRING
    * </ul>
-   * <strong>Unlike other predicates, this validation only logs in case of an invalid string.</strong>
-   * This is because the WKT parser has been changed over time, and some old strings are not valid according
-   * to the current parser.
+   *
+   * <strong>Unlike other predicates, this validation only logs in case of an invalid
+   * string.</strong> This is because the WKT parser has been changed over time, and some old
+   * strings are not valid according to the current parser.
    *
    * @param geometry
    */
@@ -65,7 +63,8 @@ public class WithinPredicate implements Predicate {
       // test if it is a valid WKT
       SearchTypeValidator.validate(OccurrenceSearchParameter.GEOMETRY, geometry);
     } catch (IllegalArgumentException e) {
-      // Log invalid strings, but continue - the geometry parser has changed over time, and some once-valid strings
+      // Log invalid strings, but continue - the geometry parser has changed over time, and some
+      // once-valid strings
       // are no longer considered valid.  See https://github.com/gbif/gbif-api/issues/48.
       LOG.warn("Invalid geometry string {}: {}", geometry, e.getMessage());
     }
@@ -96,7 +95,7 @@ public class WithinPredicate implements Predicate {
   @Override
   public String toString() {
     return new StringJoiner(", ", WithinPredicate.class.getSimpleName() + "[", "]")
-      .add("geometry='" + geometry + "'")
-      .toString();
+        .add("geometry='" + geometry + "'")
+        .toString();
   }
 }

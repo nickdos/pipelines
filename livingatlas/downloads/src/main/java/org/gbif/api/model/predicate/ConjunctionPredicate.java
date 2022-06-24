@@ -15,15 +15,12 @@
  */
 package org.gbif.api.model.predicate;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Collection;
 import java.util.Objects;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-/**
- * This predicate is "AND"-ing its subpredicates together.
- */
+/** This predicate is "AND"-ing its subpredicates together. */
 public class ConjunctionPredicate extends CompoundPredicate {
 
   @JsonCreator

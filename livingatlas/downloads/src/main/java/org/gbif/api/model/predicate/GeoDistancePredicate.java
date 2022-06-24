@@ -13,33 +13,27 @@
  */
 package org.gbif.api.model.predicate;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Objects;
+import java.util.StringJoiner;
+import javax.validation.constraints.NotNull;
 import org.gbif.api.model.occurrence.geo.DistanceUnit;
 import org.gbif.api.util.SearchTypeValidator;
 
-import java.util.Objects;
-import java.util.StringJoiner;
-
-import javax.validation.constraints.NotNull;
-
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 /**
- * This predicate checks if an occurrence location falls within the given WKT geometry {@code value}.
+ * This predicate checks if an occurrence location falls within the given WKT geometry {@code
+ * value}.
  */
 public class GeoDistancePredicate implements Predicate {
 
-  @NotNull
-  private final DistanceUnit.GeoDistance geoDistance;
+  @NotNull private final DistanceUnit.GeoDistance geoDistance;
 
-  @NotNull
-  private final String latitude;
+  @NotNull private final String latitude;
 
-  @NotNull
-  private final String longitude;
+  @NotNull private final String longitude;
 
-  @NotNull
-  private final String distance;
+  @NotNull private final String distance;
 
   /**
    * Builds a new geodistance predicate that matches records within a given distance of a geopoint..
@@ -49,9 +43,10 @@ public class GeoDistancePredicate implements Predicate {
    * @param distance
    */
   @JsonCreator
-  public GeoDistancePredicate(@JsonProperty("latitude") String latitude,
-                              @JsonProperty("longitude") String longitude,
-                              @JsonProperty("distance") String distance) {
+  public GeoDistancePredicate(
+      @JsonProperty("latitude") String latitude,
+      @JsonProperty("longitude") String longitude,
+      @JsonProperty("distance") String distance) {
     Objects.requireNonNull(latitude, "<latitude> may not be null");
     Objects.requireNonNull(longitude, "<longitude> may not be null");
     Objects.requireNonNull(distance, "<distance> may not be null");
@@ -104,6 +99,7 @@ public class GeoDistancePredicate implements Predicate {
   @Override
   public String toString() {
     return new StringJoiner(", ", GeoDistancePredicate.class.getSimpleName() + "[", "]")
-            .add("geoDistance=" + geoDistance).toString();
+        .add("geoDistance=" + geoDistance)
+        .toString();
   }
 }

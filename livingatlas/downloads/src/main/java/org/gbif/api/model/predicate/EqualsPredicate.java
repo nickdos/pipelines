@@ -15,25 +15,20 @@
  */
 package org.gbif.api.model.predicate;
 
-import org.gbif.api.model.common.search.SearchParameter;
-
-import java.util.Objects;
-
-import javax.annotation.Nullable;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Objects;
+import javax.annotation.Nullable;
+import org.gbif.api.model.common.search.SearchParameter;
 
-/**
- * This predicate checks if its {@code key} is equal to its {@code value}.
- */
+/** This predicate checks if its {@code key} is equal to its {@code value}. */
 public class EqualsPredicate extends SimplePredicate {
 
   @JsonCreator
   public EqualsPredicate(
-    @JsonProperty("key") SearchParameter key,
-    @JsonProperty("value") String value,
-    @Nullable @JsonProperty(value = "matchCase") Boolean matchCase) {
+      @JsonProperty("key") SearchParameter key,
+      @JsonProperty("value") String value,
+      @Nullable @JsonProperty(value = "matchCase") Boolean matchCase) {
     super(false, key, value, matchCase);
   }
 
@@ -48,7 +43,7 @@ public class EqualsPredicate extends SimplePredicate {
     }
 
     SimplePredicate that = (SimplePredicate) obj;
-    return Objects.equals(this.getKey(), that.getKey()) && Objects.equals(this.getValue(), that.getValue());
+    return Objects.equals(this.getKey(), that.getKey())
+        && Objects.equals(this.getValue(), that.getValue());
   }
-
 }

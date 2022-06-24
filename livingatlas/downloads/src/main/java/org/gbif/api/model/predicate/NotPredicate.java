@@ -15,22 +15,19 @@
  */
 package org.gbif.api.model.predicate;
 
-import java.util.Objects;
-import java.util.StringJoiner;
-
-import javax.validation.constraints.NotNull;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Objects;
+import java.util.StringJoiner;
+import javax.validation.constraints.NotNull;
 
 /**
- * This predicate negates its subpredicate.
- * Note: This may not work with all combinations of subpredicates.
+ * This predicate negates its subpredicate. Note: This may not work with all combinations of
+ * subpredicates.
  */
 public class NotPredicate implements Predicate {
 
-  @NotNull
-  private final Predicate predicate;
+  @NotNull private final Predicate predicate;
 
   @JsonCreator
   public NotPredicate(@JsonProperty("predicate") Predicate predicate) {
@@ -63,7 +60,7 @@ public class NotPredicate implements Predicate {
   @Override
   public String toString() {
     return new StringJoiner(", ", NotPredicate.class.getSimpleName() + "[", "]")
-      .add("predicate=" + predicate)
-      .toString();
+        .add("predicate=" + predicate)
+        .toString();
   }
 }

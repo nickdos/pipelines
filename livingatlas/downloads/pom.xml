@@ -24,19 +24,21 @@
     <sonar.skip>true</sonar.skip>
   </properties>
   <build>
-    <sourceDirectory>src/main/scala</sourceDirectory>
     <resources>
       <resource>
         <directory>src/main/resources</directory>
       </resource>
+      <resource>
+        <directory>src/main/java</directory>
+      </resource>
+      <resource>
+          <directory>src/main/scala</directory>
+      </resource>
     </resources>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.scala-tools</groupId>
@@ -107,10 +109,6 @@
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

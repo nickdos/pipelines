@@ -15,46 +15,39 @@
  */
 package org.gbif.api.model.predicate;
 
-import org.gbif.api.annotation.Experimental;
-import org.gbif.api.model.common.search.SearchParameter;
-import org.gbif.api.util.SearchTypeValidator;
+import static org.gbif.api.util.PreconditionUtils.checkArgument;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.StringJoiner;
-
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
+import org.gbif.api.annotation.Experimental;
+import org.gbif.api.model.common.search.SearchParameter;
+import org.gbif.api.util.SearchTypeValidator;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-import static org.gbif.api.util.PreconditionUtils.checkArgument;
-
-/**
- * This predicate checks if its {@code key} contains any of its {@code values}.
- */
+/** This predicate checks if its {@code key} contains any of its {@code values}. */
 public class InPredicate implements Predicate {
 
-  @NotNull
-  private final SearchParameter key;
+  @NotNull private final SearchParameter key;
 
   @NotNull
   @Size(min = 1)
   private final Collection<String> values;
 
-  @Experimental
-  @Nullable
-  private final Boolean matchCase;
+  @Experimental @Nullable private final Boolean matchCase;
 
   @JsonCreator
-  public InPredicate(@JsonProperty("key") SearchParameter key,
-                     @JsonProperty("values") Collection<String> values,
-                     @JsonProperty(value = "matchCase", defaultValue = "false") Boolean matchCase) {
+  public InPredicate(
+      @JsonProperty("key") SearchParameter key,
+      @JsonProperty("values") Collection<String> values,
+      @JsonProperty(value = "matchCase", defaultValue = "false") Boolean matchCase) {
     this.matchCase = matchCase;
     Objects.requireNonNull(key, "<key> may not be null");
     Objects.requireNonNull(values, "<values> may not be null");
@@ -77,12 +70,14 @@ public class InPredicate implements Predicate {
   }
 
   /**
-   * This flag enables the use of case-sensitive matches and aggregations on certain search parameters.
-   * <p>
-   * Fields that support this feature are: occurrenceId, recordedBy, samplingProtocol, catalogNumber, collectionCode,
-   * institutionCode, eventId, parentEventId, waterBody, stateProvince, recordNumber, identifiedBy, organismId and locality.
-   * <p>
-   * This is an experimental feature and its implementation map change or be removed at any time.
+   * This flag enables the use of case-sensitive matches and aggregations on certain search
+   * parameters.
+   *
+   * <p>Fields that support this feature are: occurrenceId, recordedBy, samplingProtocol,
+   * catalogNumber, collectionCode, institutionCode, eventId, parentEventId, waterBody,
+   * stateProvince, recordNumber, identifiedBy, organismId and locality.
+   *
+   * <p>This is an experimental feature and its implementation map change or be removed at any time.
    */
   @Experimental
   public Boolean isMatchCase() {
@@ -98,9 +93,7 @@ public class InPredicate implements Predicate {
       return false;
     }
     InPredicate that = (InPredicate) o;
-    return key == that.key &&
-           Objects.equals(values, that.values) &&
-           matchCase == that.matchCase;
+    return key == that.key && Objects.equals(values, that.values) && matchCase == that.matchCase;
   }
 
   @Override
@@ -111,9 +104,9 @@ public class InPredicate implements Predicate {
   @Override
   public String toString() {
     return new StringJoiner(", ", InPredicate.class.getSimpleName() + "[", "]")
-      .add("key=" + key)
-      .add("values=" + values)
-      .add("matchCase=" + matchCase)
-      .toString();
+        .add("key=" + key)
+        .add("values=" + values)
+        .add("matchCase=" + matchCase)
+        .toString();
   }
 }

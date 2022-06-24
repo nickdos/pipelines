@@ -15,22 +15,17 @@
  */
 package org.gbif.api.model.predicate;
 
-import org.gbif.api.model.occurrence.search.OccurrenceSearchParameter;
-
-import java.util.Objects;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Objects;
+import org.gbif.api.model.occurrence.search.OccurrenceSearchParameter;
 
-/**
- * This predicate checks if its {@code key} is greater than its {@code value}.
- */
+/** This predicate checks if its {@code key} is greater than its {@code value}. */
 public class GreaterThanPredicate extends SimplePredicate {
 
   @JsonCreator
   public GreaterThanPredicate(
-    @JsonProperty("key") OccurrenceSearchParameter key,
-    @JsonProperty("value") String value) {
+      @JsonProperty("key") OccurrenceSearchParameter key, @JsonProperty("value") String value) {
     super(true, key, value, null);
   }
 
@@ -46,6 +41,6 @@ public class GreaterThanPredicate extends SimplePredicate {
 
     SimplePredicate that = (SimplePredicate) obj;
     return Objects.equals(this.getKey(), that.getKey())
-      && Objects.equals(this.getValue(), that.getValue());
+        && Objects.equals(this.getValue(), that.getValue());
   }
 }

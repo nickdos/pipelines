@@ -15,28 +15,25 @@
  */
 package org.gbif.api.model.predicate;
 
+import static org.gbif.api.util.PreconditionUtils.checkArgument;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.StringJoiner;
-
 import javax.validation.constraints.NotNull;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-import static org.gbif.api.util.PreconditionUtils.checkArgument;
-
 /**
- * A compound predicate is a Predicate that itself contains other Predicates.
- * This is to be used as a base class because the way the containing Predicates
- * should be combined needs to be specified (e.g. "AND", "OR").
+ * A compound predicate is a Predicate that itself contains other Predicates. This is to be used as
+ * a base class because the way the containing Predicates should be combined needs to be specified
+ * (e.g. "AND", "OR").
  */
 public class CompoundPredicate implements Predicate {
 
-  @NotNull
-  private final Collection<Predicate> predicates;
+  @NotNull private final Collection<Predicate> predicates;
 
   @JsonCreator
   protected CompoundPredicate(@JsonProperty("predicates") Collection<Predicate> predicates) {
@@ -46,7 +43,8 @@ public class CompoundPredicate implements Predicate {
   }
 
   /**
-   * Returns all the predicates this compound predicate is made out of in an <em>immutable</em> collection.
+   * Returns all the predicates this compound predicate is made out of in an <em>immutable</em>
+   * collection.
    *
    * @return the immutable collection of child predicates.
    */
@@ -74,7 +72,7 @@ public class CompoundPredicate implements Predicate {
   @Override
   public String toString() {
     return new StringJoiner(", ", CompoundPredicate.class.getSimpleName() + "[", "]")
-      .add("predicates=" + predicates)
-      .toString();
+        .add("predicates=" + predicates)
+        .toString();
   }
 }

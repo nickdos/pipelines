@@ -15,20 +15,16 @@
  */
 package org.gbif.api.model.predicate;
 
-import org.gbif.api.model.common.search.SearchParameter;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.gbif.api.model.common.search.SearchParameter;
 
-/**
- * This predicate checks if its {@code key} is less or equal than its {@code value}.
- */
+/** This predicate checks if its {@code key} is less or equal than its {@code value}. */
 public class LessThanOrEqualsPredicate extends SimplePredicate {
 
   @JsonCreator
   public LessThanOrEqualsPredicate(
-    @JsonProperty("key") SearchParameter key,
-    @JsonProperty("value") String value) {
+      @JsonProperty("key") SearchParameter key, @JsonProperty("value") String value) {
     super(true, key, value, null);
   }
 }
