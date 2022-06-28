@@ -73,9 +73,9 @@ public class InterpretedMessageHandler {
     publisher.send(outputMessage);
     log.info("The message has been sent - {}", outputMessage);
 
-    if (m.getDatasetType() == DatasetType.SAMPLING_EVENT) {
+    if (config.eventsEnabled && m.getDatasetType() == DatasetType.SAMPLING_EVENT) {
       Set<String> interpretationTypes = new HashSet<>(m.getInterpretTypes());
-      interpretationTypes.add(RecordType.EVENT_CORE.name());
+      interpretationTypes.add(RecordType.EVENT.name());
 
       PipelinesEventsMessage eventsMessage =
           new PipelinesEventsMessage(

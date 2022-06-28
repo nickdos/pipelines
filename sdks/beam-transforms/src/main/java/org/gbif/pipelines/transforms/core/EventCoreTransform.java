@@ -1,7 +1,7 @@
 package org.gbif.pipelines.transforms.core;
 
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.EVENT_CORE_RECORDS_COUNT;
-import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType.EVENT_CORE;
+import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType.EVENT;
 
 import java.time.Instant;
 import java.util.Map;
@@ -43,10 +43,7 @@ public class EventCoreTransform extends Transform<ExtendedRecord, EventCoreRecor
       SerializableSupplier<VocabularyService> vocabularyServiceSupplier,
       PCollectionView<Map<String, Map<String, String>>> erWithParentsView) {
     super(
-        EventCoreRecord.class,
-        EVENT_CORE,
-        EventCoreTransform.class.getName(),
-        EVENT_CORE_RECORDS_COUNT);
+        EventCoreRecord.class, EVENT, EventCoreTransform.class.getName(), EVENT_CORE_RECORDS_COUNT);
     this.vocabularyServiceSupplier = vocabularyServiceSupplier;
     this.erWithParentsView = erWithParentsView;
   }
@@ -116,11 +113,11 @@ public class EventCoreTransform extends Transform<ExtendedRecord, EventCoreRecor
         .via((e, r) -> CoreInterpreter.interpretSampleSizeValue(e, r::setSampleSizeValue))
         .via((e, r) -> CoreInterpreter.interpretLicense(e, r::setLicense))
         .via((e, r) -> CoreInterpreter.interpretDatasetID(e, r::setDatasetID))
-        .via((e, r) -> CoreInterpreter.interpretLocationID(e, r::setLocationID))
         .via((e, r) -> CoreInterpreter.interpretParentEventID(e, r::setParentEventID))
         .via((e, r) -> CoreInterpreter.interpretDatasetName(e, r::setDatasetName))
         .via((e, r) -> CoreInterpreter.interpretSamplingProtocol(e, r::setSamplingProtocol))
         .via((e, r) -> CoreInterpreter.interpretParentEventID(e, r::setParentEventID))
+        .via((e, r) -> CoreInterpreter.interpretLocationID(e, r::setLocationID))
         .via(CoreInterpreter.interpretLineages(erWithParents, vocabularyService))
         .getOfNullable();
   }

@@ -78,11 +78,6 @@ public class CoreInterpreter {
     consumer.accept(license);
   }
 
-  /** {@link DwcTerm#locationID} interpretation. */
-  public static void interpretLocationID(ExtendedRecord er, Consumer<String> consumer) {
-    extractOptValue(er, DwcTerm.locationID).ifPresent(consumer);
-  }
-
   /** {@link DwcTerm#datasetID} interpretation. */
   public static void interpretDatasetID(ExtendedRecord er, Consumer<List<String>> consumer) {
     extractOptListValue(er, DwcTerm.datasetID).ifPresent(consumer);
@@ -129,6 +124,11 @@ public class CoreInterpreter {
   /** {@link DwcTerm#samplingProtocol} interpretation. */
   public static void interpretSamplingProtocol(ExtendedRecord er, Consumer<List<String>> consumer) {
     extractOptListValue(er, DwcTerm.samplingProtocol).ifPresent(consumer);
+  }
+
+  /** {@link DwcTerm#locationID} interpretation. */
+  public static void interpretLocationID(ExtendedRecord er, Consumer<String> consumer) {
+    extractOptValue(er, DwcTerm.locationID).ifPresent(consumer);
   }
 
   /** Returns ENUM instead of url string */

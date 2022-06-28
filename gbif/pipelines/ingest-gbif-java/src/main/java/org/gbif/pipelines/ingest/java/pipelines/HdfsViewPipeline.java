@@ -67,6 +67,7 @@ import org.gbif.pipelines.core.converters.ReferenceTableConverter;
 import org.gbif.pipelines.core.converters.ResourceRelationshipTableConverter;
 import org.gbif.pipelines.core.pojo.HdfsConfigs;
 import org.gbif.pipelines.core.utils.FsUtils;
+import org.gbif.pipelines.core.utils.HdfsViewUtils;
 import org.gbif.pipelines.ingest.java.metrics.IngestMetricsBuilder;
 import org.gbif.pipelines.ingest.java.transforms.OccurrenceHdfsRecordConverter;
 import org.gbif.pipelines.ingest.java.transforms.TableConverter;
@@ -76,6 +77,7 @@ import org.gbif.pipelines.ingest.utils.SharedLockUtils;
 import org.gbif.pipelines.io.avro.AudubonRecord;
 import org.gbif.pipelines.io.avro.BasicRecord;
 import org.gbif.pipelines.io.avro.ClusteringRecord;
+import org.gbif.pipelines.io.avro.EventCoreRecord;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.GbifIdRecord;
 import org.gbif.pipelines.io.avro.ImageRecord;
@@ -107,6 +109,7 @@ import org.gbif.pipelines.io.avro.extension.ggbn.PreservationTable;
 import org.gbif.pipelines.io.avro.extension.obis.ExtendedMeasurementOrFactTable;
 import org.gbif.pipelines.io.avro.grscicoll.GrscicollRecord;
 import org.gbif.pipelines.transforms.core.BasicTransform;
+import org.gbif.pipelines.transforms.core.EventCoreTransform;
 import org.gbif.pipelines.transforms.core.GrscicollTransform;
 import org.gbif.pipelines.transforms.core.LocationTransform;
 import org.gbif.pipelines.transforms.core.TaxonomyTransform;
@@ -159,9 +162,7 @@ import org.slf4j.MDC;
  */
 @Slf4j
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class OccurrenceToHdfsViewPipeline {
-
-  private static final DwcTerm CORE_TERM = DwcTerm.Occurrence;
+public class HdfsViewPipeline {
 
   public static void main(String[] args) {
     run(args);
@@ -186,13 +187,27 @@ public class OccurrenceToHdfsViewPipeline {
     run(options, executor);
   }
 
+  private static StepType getStepType(RecordType recordType) {
+    if (EVENT == recordType) {
+      return StepType.EVENTS_HDFS_VIEW;
+    }
+
+    if (OCCURRENCE == recordType) {
+      return StepType.HDFS_VIEW;
+    }
+
+    throw new IllegalArgumentException("Record type not supported:" + recordType);
+  }
+
   @SneakyThrows
   public static void run(InterpretationPipelineOptions options, ExecutorService executor) {
 
     MDC.put("datasetKey", options.getDatasetId());
     MDC.put("attempt", options.getAttempt().toString());
-    MDC.put("step", StepType.HDFS_VIEW.name());
+    MDC.put("step", getStepType(options.getCoreRecordType()).name());
 
+    RecordType recordType = options.getCoreRecordType();
+    DwcTerm coreTerm = HdfsViewUtils.getCoreTerm(recordType);
     HdfsConfigs hdfsConfigs =
         HdfsConfigs.create(options.getHdfsSiteConfig(), options.getCoreSiteConfig());
     String datasetId = options.getDatasetId();
@@ -204,12 +219,13 @@ public class OccurrenceToHdfsViewPipeline {
 
     // Deletes the target path if it exists
     FsUtils.deleteInterpretIfExist(
-        hdfsConfigs, options.getInputPath(), datasetId, attempt, CORE_TERM, deleteTypes);
+        hdfsConfigs, options.getInputPath(), datasetId, attempt, coreTerm, deleteTypes);
 
     Function<InterpretationType, String> pathFn =
         st -> {
           String id = datasetId + '_' + attempt + AVRO_EXTENSION;
-          return PathBuilder.buildFilePathViewUsingInputPath(options, st.name().toLowerCase(), id);
+          return PathBuilder.buildFilePathViewUsingInputPath(
+              options, recordType, st.name().toLowerCase(), id);
         };
 
     log.info("Init metrics");
@@ -219,45 +235,44 @@ public class OccurrenceToHdfsViewPipeline {
 
     // Reading all avro files in parallel
     CompletableFuture<Map<String, MetadataRecord>> metadataMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, MetadataTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, MetadataTransform.builder().create());
 
     CompletableFuture<Map<String, ExtendedRecord>> verbatimMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, VerbatimTransform.create());
+        readAvroAsFuture(options, coreTerm, executor, VerbatimTransform.create());
 
     CompletableFuture<Map<String, GbifIdRecord>> idMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, GbifIdTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, GbifIdTransform.builder().create());
 
     CompletableFuture<Map<String, ClusteringRecord>> clusteringMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, ClusteringTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, ClusteringTransform.builder().create());
 
     CompletableFuture<Map<String, BasicRecord>> basicMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, BasicTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, BasicTransform.builder().create());
 
     CompletableFuture<Map<String, TemporalRecord>> temporalMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, TemporalTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, TemporalTransform.builder().create());
 
     CompletableFuture<Map<String, LocationRecord>> locationMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, LocationTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, LocationTransform.builder().create());
 
     CompletableFuture<Map<String, TaxonRecord>> taxonMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, TaxonomyTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, TaxonomyTransform.builder().create());
 
     CompletableFuture<Map<String, GrscicollRecord>> grscicollMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, GrscicollTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, GrscicollTransform.builder().create());
 
     CompletableFuture<Map<String, MultimediaRecord>> multimediaMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, MultimediaTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, MultimediaTransform.builder().create());
 
     CompletableFuture<Map<String, ImageRecord>> imageMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, ImageTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, ImageTransform.builder().create());
 
     CompletableFuture<Map<String, AudubonRecord>> audubonMapFeature =
-        readAvroAsFuture(options, CORE_TERM, executor, AudubonTransform.builder().create());
+        readAvroAsFuture(options, coreTerm, executor, AudubonTransform.builder().create());
 
     Map<String, GbifIdRecord> idRecordMap = idMapFeature.get();
 
-    // OccurrenceHdfsRecord
-    Function<GbifIdRecord, Optional<OccurrenceHdfsRecord>> occurrenceHdfsRecordFn =
+    OccurrenceHdfsRecordConverter.OccurrenceHdfsRecordConverterBuilder builder =
         OccurrenceHdfsRecordConverter.builder()
             .metrics(metrics)
             .metadata(metadataMapFeature.get().values().iterator().next())
@@ -270,9 +285,17 @@ public class OccurrenceToHdfsViewPipeline {
             .grscicollMap(grscicollMapFeature.get())
             .multimediaMap(multimediaMapFeature.get())
             .imageMap(imageMapFeature.get())
-            .audubonMap(audubonMapFeature.get())
-            .build()
-            .getFn();
+            .audubonMap(audubonMapFeature.get());
+
+    if (RecordType.EVENT == recordType) {
+      CompletableFuture<Map<String, EventCoreRecord>> eventCoreMapFeature =
+          readAvroAsFuture(options, coreTerm, executor, EventCoreTransform.builder().create());
+      builder.eventCoreRecordMap(eventCoreMapFeature.get());
+    }
+
+    // OccurrenceHdfsRecord
+    Function<GbifIdRecord, Optional<OccurrenceHdfsRecord>> occurrenceHdfsRecordFn =
+        builder.build().getFn();
 
     TableRecordWriter.<OccurrenceHdfsRecord>builder()
         .recordFunction(occurrenceHdfsRecordFn)
@@ -281,8 +304,8 @@ public class OccurrenceToHdfsViewPipeline {
         .schema(OccurrenceHdfsRecord.getClassSchema())
         .executor(executor)
         .options(options)
-        .types(Collections.singleton(OCCURRENCE.name()))
-        .recordType(OCCURRENCE)
+        .types(Collections.singleton(recordType.name()))
+        .recordType(recordType)
         .build()
         .write();
 

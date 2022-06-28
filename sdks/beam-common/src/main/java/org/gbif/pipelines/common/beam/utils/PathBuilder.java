@@ -44,10 +44,11 @@ public class PathBuilder {
    */
   public static String buildPathInterpretUsingTargetPath(
       BasePipelineOptions options, DwcTerm core, String name, String uniqueId) {
-    return String.join(Path.SEPARATOR,
-            buildDatasetAttemptPath(options, core.simpleName().toLowerCase(), false),
-            name,
-            PipelinesVariables.Pipeline.Interpretation.FILE_NAME + uniqueId);
+    return String.join(
+        Path.SEPARATOR,
+        buildDatasetAttemptPath(options, core.simpleName().toLowerCase(), false),
+        name,
+        PipelinesVariables.Pipeline.Interpretation.FILE_NAME + uniqueId);
   }
 
   /**
@@ -57,10 +58,11 @@ public class PathBuilder {
    */
   public static String buildPathInterpretUsingInputPath(
       BasePipelineOptions options, DwcTerm core, String name, String uniqueId) {
-    return String.join(Path.SEPARATOR,
-            buildDatasetAttemptPath(options, core.simpleName().toLowerCase(), true),
-            name,
-            PipelinesVariables.Pipeline.Interpretation.FILE_NAME + uniqueId);
+    return String.join(
+        Path.SEPARATOR,
+        buildDatasetAttemptPath(options, core.simpleName().toLowerCase(), true),
+        name,
+        PipelinesVariables.Pipeline.Interpretation.FILE_NAME + uniqueId);
   }
 
   /**
@@ -70,8 +72,11 @@ public class PathBuilder {
    * @return path to the directory where the occurrence hdfs view is stored
    */
   public static String buildFilePathViewUsingInputPath(
-      BasePipelineOptions options, String type, String uniqueId) {
-    String corePath = DwcTerm.Occurrence.simpleName().toLowerCase();
+      BasePipelineOptions options,
+      PipelinesVariables.Pipeline.Interpretation.RecordType recordType,
+      String type,
+      String uniqueId) {
+    String corePath = recordType.name().toLowerCase();
     return buildPath(buildDatasetAttemptPath(options, corePath, true), type.toLowerCase(), uniqueId)
         .toString();
   }

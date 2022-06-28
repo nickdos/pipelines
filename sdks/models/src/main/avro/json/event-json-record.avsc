@@ -64,8 +64,8 @@
       {"name":"eventDateSingle","type":["null","string"],"default":null,"doc":""},
       {"name":"startDayOfYear","type":["null","int"],"default":null,"doc":""},
       {"name":"endDayOfYear","type":["null","int"],"default":null,"doc":""},
+      {"name": "locationID", "type": ["null", "string"], "default" : null, "doc": ""},
       // Location
-      {"name":"locationID","type":["null","string"],"default":null,"doc":""},
       {"name":"locality","type":["null","string"],"default":null,"doc":""},
       {"name":"continent","type":["null","string"],"default":null,"doc":""},
       {"name":"waterBody","type":["null","string"],"default":null,"doc":""},

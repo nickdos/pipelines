@@ -13,6 +13,8 @@ public class GbifParentJsonConverter extends ParentJsonConverter {
 
   @Override
   protected void mapTaxonRecord(Builder builder) {
-    builder.setGbifClassification(JsonConverter.convertClassification(verbatim, taxon));
+    if (taxon != null) {
+      builder.setGbifClassification(JsonConverter.convertClassification(verbatim, taxon));
+    }
   }
 }

@@ -71,7 +71,7 @@ public abstract class ParentJsonConverter {
         .setId(occurrenceJsonRecord.getId())
         .setInternalId(
             HashConverter.getSha1(
-                occurrenceJsonRecord.getDatasetKey(),
+                metadata.getDatasetKey(),
                 occurrenceJsonRecord.getVerbatim().getParentCoreId(),
                 occurrenceJsonRecord.getOccurrenceId()))
         .setJoinRecordBuilder(
@@ -79,9 +79,10 @@ public abstract class ParentJsonConverter {
                 .setName("occurrence")
                 .setParent(
                     HashConverter.getSha1(
-                        occurrenceJsonRecord.getDatasetKey(),
+                        metadata.getDatasetKey(),
                         occurrenceJsonRecord.getVerbatim().getParentCoreId())))
         .setOccurrence(occurrenceJsonRecord)
+        .setMetadataBuilder(mapMetadataJsonRecord())
         .build();
   }
 
@@ -218,7 +219,8 @@ public abstract class ParentJsonConverter {
         .setDatasetName(eventCore.getDatasetName())
         .setSamplingProtocol(eventCore.getSamplingProtocol())
         .setParentsLineage(convertParents(eventCore.getParentsLineage()))
-        .setParentEventID(eventCore.getParentEventID());
+        .setParentEventID(eventCore.getParentEventID())
+        .setLocationID(eventCore.getLocationID());
 
     // Vocabulary
     JsonConverter.convertVocabularyConcept(eventCore.getEventType())

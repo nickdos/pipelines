@@ -1,4 +1,4 @@
-package org.gbif.pipelines.tasks.occurrences.hdfs;
+package org.gbif.pipelines.common.hdfs;
 
 import com.google.common.base.Strings;
 import java.io.IOException;
@@ -11,11 +11,10 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.curator.framework.CuratorFramework;
 import org.gbif.api.model.pipelines.StepRunner;
-import org.gbif.api.model.pipelines.StepType;
 import org.gbif.common.messaging.AbstractMessageCallback;
 import org.gbif.common.messaging.api.MessagePublisher;
-import org.gbif.common.messaging.api.messages.PipelinesHdfsViewBuiltMessage;
-import org.gbif.common.messaging.api.messages.PipelinesInterpretedMessage;
+import org.gbif.common.messaging.api.messages.PipelineBasedMessage;
+import org.gbif.common.messaging.api.messages.PipelinesInterpretationMessage;
 import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.pipelines.common.PipelinesVariables.Metrics;
 import org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType;
@@ -25,33 +24,32 @@ import org.gbif.pipelines.common.process.ProcessRunnerBuilder;
 import org.gbif.pipelines.common.process.ProcessRunnerBuilder.ProcessRunnerBuilderBuilder;
 import org.gbif.pipelines.common.utils.HdfsUtils;
 import org.gbif.pipelines.core.pojo.HdfsConfigs;
-import org.gbif.pipelines.ingest.java.pipelines.OccurrenceToHdfsViewPipeline;
+import org.gbif.pipelines.ingest.java.pipelines.HdfsViewPipeline;
 import org.gbif.pipelines.tasks.PipelinesCallback;
 import org.gbif.pipelines.tasks.StepHandler;
 import org.gbif.pipelines.tasks.occurrences.interpretation.InterpreterConfiguration;
 import org.gbif.registry.ws.client.pipelines.PipelinesHistoryClient;
 
-/** Callback which is called when the {@link PipelinesInterpretedMessage} is received. */
+/** Callback which is called when an instance {@link PipelinesInterpretationMessage} is received. */
 @Slf4j
 @AllArgsConstructor
-public class HdfsViewCallback extends AbstractMessageCallback<PipelinesInterpretedMessage>
-    implements StepHandler<PipelinesInterpretedMessage, PipelinesHdfsViewBuiltMessage> {
+public abstract class HdfsViewCallback<
+        I extends PipelinesInterpretationMessage, B extends PipelineBasedMessage>
+    extends AbstractMessageCallback<I> implements StepHandler<I, B> {
 
-  private static final StepType TYPE = StepType.HDFS_VIEW;
-
-  private final HdfsViewConfiguration config;
+  protected final org.gbif.pipelines.common.hdfs.HdfsViewConfiguration config;
   private final MessagePublisher publisher;
   private final CuratorFramework curator;
   private final PipelinesHistoryClient historyClient;
   private final ExecutorService executor;
 
   @Override
-  public void handleMessage(PipelinesInterpretedMessage message) {
-    PipelinesCallback.<PipelinesInterpretedMessage, PipelinesHdfsViewBuiltMessage>builder()
+  public void handleMessage(I message) {
+    PipelinesCallback.<I, B>builder()
         .historyClient(historyClient)
         .config(config)
         .curator(curator)
-        .stepType(TYPE)
+        .stepType(config.stepType)
         .publisher(publisher)
         .message(message)
         .handler(this)
@@ -61,11 +59,11 @@ public class HdfsViewCallback extends AbstractMessageCallback<PipelinesInterpret
 
   /** Main message processing logic, creates a terminal java process, which runs */
   @Override
-  public Runnable createRunnable(PipelinesInterpretedMessage message) {
+  public Runnable createRunnable(I message) {
     return () -> {
       try {
 
-        // If there is one step only like metadata, we have to run OCCURRENCE steps
+        // If there is one step only like metadata, we have to run pipelines steps
         message.setInterpretTypes(swapInterpretTypes(message.getInterpretTypes()));
 
         int fileShards = computeNumberOfShards(message);
@@ -74,7 +72,8 @@ public class HdfsViewCallback extends AbstractMessageCallback<PipelinesInterpret
             ProcessRunnerBuilder.builder()
                 .distributedConfig(config.distributedConfig)
                 .sparkConfig(config.sparkConfig)
-                .sparkAppName(TYPE + "_" + message.getDatasetUuid() + "_" + message.getAttempt())
+                .sparkAppName(
+                    config.stepType + "_" + message.getDatasetUuid() + "_" + message.getAttempt())
                 .beamConfigFn(BeamSettings.occurrenceHdfsView(config, message, fileShards));
 
         Predicate<StepRunner> runnerPr = sr -> config.processRunner.equalsIgnoreCase(sr.name());
@@ -94,22 +93,21 @@ public class HdfsViewCallback extends AbstractMessageCallback<PipelinesInterpret
   }
 
   @Override
-  public PipelinesHdfsViewBuiltMessage createOutgoingMessage(PipelinesInterpretedMessage message) {
-    return new PipelinesHdfsViewBuiltMessage(
-        message.getDatasetUuid(), message.getAttempt(), message.getPipelineSteps());
-  }
+  public abstract B createOutgoingMessage(I message);
+
+  public abstract String routingKey();
 
   /**
    * Only correct messages can be handled, by now is only messages with the same runner as runner in
    * service config {@link HdfsViewConfiguration#processRunner}
    */
   @Override
-  public boolean isMessageCorrect(PipelinesInterpretedMessage message) {
+  public boolean isMessageCorrect(I message) {
     if (Strings.isNullOrEmpty(message.getRunner())) {
       throw new IllegalArgumentException("Runner can't be null or empty " + message);
     }
     if (message.getOnlyForStep() != null
-        && !message.getOnlyForStep().equalsIgnoreCase(TYPE.name())) {
+        && !message.getOnlyForStep().equalsIgnoreCase(config.stepType.name())) {
       log.info("Skipping, because expected step is {}", message.getOnlyForStep());
       return false;
     }
@@ -121,11 +119,10 @@ public class HdfsViewCallback extends AbstractMessageCallback<PipelinesInterpret
   }
 
   private void runLocal(ProcessRunnerBuilderBuilder builder) {
-    OccurrenceToHdfsViewPipeline.run(builder.build().buildOptions(), executor);
+    HdfsViewPipeline.run(builder.build().buildOptions(), executor);
   }
 
-  private void runDistributed(
-      PipelinesInterpretedMessage message, ProcessRunnerBuilderBuilder builder)
+  private void runDistributed(I message, ProcessRunnerBuilderBuilder builder)
       throws IOException, InterruptedException {
 
     long recordsNumber = getRecordNumber(message);
@@ -144,17 +141,17 @@ public class HdfsViewCallback extends AbstractMessageCallback<PipelinesInterpret
   }
 
   /**
-   * Reads number of records from a archive-to-avro metadata file, verbatim-to-interpreted contains
+   * Reads number of records from an archive-to-avro metadata file, verbatim-to-interpreted contains
    * attempted records count, which is not accurate enough
    */
-  private long getRecordNumber(PipelinesInterpretedMessage message) throws IOException {
+  private long getRecordNumber(I message) throws IOException {
     String datasetId = message.getDatasetUuid().toString();
     String attempt = Integer.toString(message.getAttempt());
     String metaFileName = new InterpreterConfiguration().metaFileName;
     String metaPath =
         String.join("/", config.stepConfig.repositoryPath, datasetId, attempt, metaFileName);
 
-    Long messageNumber = message.getNumberOfRecords();
+    Long messageNumber = message.getNumberOfInterpretationRecords();
     HdfsConfigs hdfsConfigs =
         HdfsConfigs.create(config.stepConfig.hdfsSiteConfig, config.stepConfig.coreSiteConfig);
     Optional<Long> fileNumber =
@@ -177,7 +174,7 @@ public class HdfsViewCallback extends AbstractMessageCallback<PipelinesInterpret
     return fileNumber.get();
   }
 
-  private int computeNumberOfShards(PipelinesInterpretedMessage message) throws IOException {
+  private int computeNumberOfShards(I message) throws IOException {
     String datasetId = message.getDatasetUuid().toString();
     String attempt = Integer.toString(message.getAttempt());
     String dirPath =
@@ -202,7 +199,7 @@ public class HdfsViewCallback extends AbstractMessageCallback<PipelinesInterpret
     return numberOfShards <= 0 ? 1 : (int) numberOfShards;
   }
 
-  // If there is one step only like metadata, we have to run OCCURRENCE steps
+  // If there is one step only like metadata, we have to run the RecordType steps
   private Set<String> swapInterpretTypes(Set<String> interpretTypes) {
     if (interpretTypes.isEmpty()) {
       return Collections.singleton(RecordType.ALL.name());
@@ -212,7 +209,7 @@ public class HdfsViewCallback extends AbstractMessageCallback<PipelinesInterpret
     }
     if (interpretTypes.size() == 1
         && RecordType.getAllInterpretationAsString().containsAll(interpretTypes)) {
-      return Collections.singleton(RecordType.OCCURRENCE.name());
+      return Collections.singleton(config.recordType.name());
     }
     return interpretTypes;
   }

@@ -80,7 +80,7 @@ object DenormalisationPipeline {
 
     System.out.println("Load events")
     val eventCoreDF = spark.read.format("avro").
-      load(s"${hdfsPath}/${datasetId}/${attempt}/event/event_core/*.avro").as("event")
+      load(s"${hdfsPath}/${datasetId}/${attempt}/event/event/*.avro").as("event")
 
     System.out.println("Load location")
     val locationDF = spark.read.format("avro").

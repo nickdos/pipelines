@@ -58,13 +58,14 @@ public class VerbatimMessageHandler {
     }
 
     // case of sampling event dataset without occurrences. We only run the events pipelines
-    if (m.getDatasetType() == DatasetType.SAMPLING_EVENT
+    if (config.eventsEnabled
+        && m.getDatasetType() == DatasetType.SAMPLING_EVENT
         && (m.getValidationResult().getNumberOfRecords() == null
             || m.getValidationResult().getNumberOfRecords() == 0)
         && m.getValidationResult().getNumberOfEventRecords() != null
         && m.getValidationResult().getNumberOfEventRecords() > 0) {
       Set<String> interpretationTypes = new HashSet<>(m.getInterpretTypes());
-      interpretationTypes.add(RecordType.EVENT_CORE.name());
+      interpretationTypes.add(RecordType.EVENT.name());
 
       PipelinesEventsMessage eventsMessage =
           new PipelinesEventsMessage(
