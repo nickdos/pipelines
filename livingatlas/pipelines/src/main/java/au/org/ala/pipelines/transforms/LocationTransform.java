@@ -145,42 +145,38 @@ public class LocationTransform extends Transform<ExtendedRecord, LocationRecord>
   @Override
   public Optional<LocationRecord> convert(ExtendedRecord source) {
 
-    LocationRecord lr =
-        LocationRecord.newBuilder()
-            .setId(source.getId())
-            .setCreated(Instant.now().toEpochMilli())
-            .build();
-
-    Optional<LocationRecord> result =
-        Interpretation.from(source)
-            .to(lr)
-            .when(er -> !er.getCoreTerms().isEmpty())
-            .via(LocationInterpreter.interpretCountryAndCoordinates(countryKvStore, null))
-            .via(ALALocationInterpreter.interpretStateProvince(stateProvinceKvStore))
-            .via(ALALocationInterpreter.interpretBiome(biomeKvStore))
-            .via(LocationInterpreter::interpretContinent)
-            .via(LocationInterpreter::interpretWaterBody)
-            .via(LocationInterpreter::interpretMinimumElevationInMeters)
-            .via(LocationInterpreter::interpretMaximumElevationInMeters)
-            .via(LocationInterpreter::interpretElevation)
-            .via(LocationInterpreter::interpretMinimumDepthInMeters)
-            .via(LocationInterpreter::interpretMaximumDepthInMeters)
-            .via(LocationInterpreter::interpretDepth)
-            .via(LocationInterpreter::interpretMinimumDistanceAboveSurfaceInMeters)
-            .via(LocationInterpreter::interpretMaximumDistanceAboveSurfaceInMeters)
-            .via(LocationInterpreter::interpretCoordinatePrecision)
-            .via(ALALocationInterpreter::interpretCoordinateUncertaintyInMeters)
-            .via(alaLocationInterpreter::interpretGeoreferencedDate)
-            .via(ALALocationInterpreter::interpretGeoreferenceTerms)
-            .via(
-                ALALocationInterpreter.verifyLocationInfo(
-                    countryCentrePoints, stateProvinceCentrePoints, stateProvinceParser))
-            .via(ALALocationInterpreter.validateStateProvince(stateProvinceParser))
-            .via(LocationInterpreter::interpretLocality)
-            .get();
-
-    result.ifPresent(r -> this.incCounter());
-
-    return result;
+    return Interpretation.from(source)
+        .to(
+            er ->
+                LocationRecord.newBuilder()
+                    .setId(er.getId())
+                    .setCreated(Instant.now().toEpochMilli())
+                    .build())
+        .when(er -> !er.getCoreTerms().isEmpty())
+        .via(LocationInterpreter.interpretCountryAndCoordinates(countryKvStore, null))
+        .via(ALALocationInterpreter.interpretStateProvince(stateProvinceKvStore))
+        .via(ALALocationInterpreter.interpretBiome(biomeKvStore))
+        .via(LocationInterpreter::interpretContinent)
+        .via(LocationInterpreter::interpretWaterBody)
+        .via(LocationInterpreter::interpretMinimumElevationInMeters)
+        .via(LocationInterpreter::interpretMaximumElevationInMeters)
+        .via(LocationInterpreter::interpretElevation)
+        .via(LocationInterpreter::interpretMinimumDepthInMeters)
+        .via(LocationInterpreter::interpretMaximumDepthInMeters)
+        .via(LocationInterpreter::interpretDepth)
+        .via(LocationInterpreter::interpretMinimumDistanceAboveSurfaceInMeters)
+        .via(LocationInterpreter::interpretMaximumDistanceAboveSurfaceInMeters)
+        .via(LocationInterpreter::interpretCoordinatePrecision)
+        .via(ALALocationInterpreter::interpretCoordinateUncertaintyInMeters)
+        .via(alaLocationInterpreter::interpretGeoreferencedDate)
+        .via(ALALocationInterpreter::interpretGeoreferenceTerms)
+        .via(
+            ALALocationInterpreter.verifyLocationInfo(
+                countryCentrePoints, stateProvinceCentrePoints, stateProvinceParser))
+        .via(ALALocationInterpreter.validateStateProvince(stateProvinceParser))
+        .via(LocationInterpreter::interpretLocality)
+        .via(LocationInterpreter::interpretFootprintWKT)
+        .via(r -> this.incCounter())
+        .getOfNullable();
   }
 }
