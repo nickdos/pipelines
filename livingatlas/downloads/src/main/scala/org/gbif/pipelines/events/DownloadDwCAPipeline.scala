@@ -26,6 +26,11 @@ object DownloadDwCAPipeline {
 
   val workingDirectory = "/tmp/pipelines-export/"
 
+  val ARRAY_FIELDS = Array(
+    "datasetID",
+    "datasetName"
+  )
+
   val FIELDS = Array(
     "core.id",
     "biome",
@@ -34,8 +39,8 @@ object DownloadDwCAPipeline {
     "coordinateUncertaintyInMeters",
     "country",
     "countryCode",
-//    "datasetID",
-//    "datasetName",
+    "datasetID",
+    "datasetName",
     "dateIdentified",
     "datePrecision",
     "day",
@@ -89,7 +94,6 @@ object DownloadDwCAPipeline {
     }
     val localTest = args(4).toBoolean
     val predicateQueryJSON = args(5)
-
 
     val queryFilter = if (predicateQueryJSON != "{}"){
       val om = new ObjectMapper();
@@ -153,16 +157,6 @@ object DownloadDwCAPipeline {
     // get a list columns
     val exportPath = workingDirectory + jobID + s"/${coreTermTypeSimple}/"
 
-
-//    import org.apache.spark.sql.functions._
-//
-//    val stringify = udf((vs: Seq[String]) => vs match {
-//      case null => null
-//      case _    => s"""[${vs.mkString(",")}]"""
-//    })
-//
-//    filterDownloadDF.withColumn("ArrayOfString", stringify($"ArrayOfString")).write.csv(...)
-
     val filterDownloadDF = if (queryFilter != ""){
       // filter "coreTerms", "extensions"
       downloadDF.filter(queryFilter)
@@ -170,7 +164,14 @@ object DownloadDwCAPipeline {
       downloadDF
     }
 
-    filterDownloadDF.select(generateFieldColumns(FIELDS):_*).coalesce(1).write
+    var dfCoalesce = filterDownloadDF.select(generateFieldColumns(FIELDS):_*).coalesce(1)
+
+    ARRAY_FIELDS.foreach(arrayField =>{
+      dfCoalesce = dfCoalesce.withColumn(arrayField, col(arrayField).cast("string"))
+    })
+
+    dfCoalesce
+      .write
       .option("header","true")
       .option("sep","\t")
       .mode("overwrite")
