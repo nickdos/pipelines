@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.Date;
 import org.gbif.api.model.common.search.SearchParameter;
 
-@JsonDeserialize(as = EventSearchParameter.class)
-public enum EventSearchParameter implements SearchParameter {
+@JsonDeserialize(as = ALAEventSearchParameter.class)
+public enum ALAEventSearchParameter implements SearchParameter {
   DATASET_KEY(String.class),
   PARENT_EVENT_ID(String.class),
   EVENT_ID(String.class),
@@ -21,7 +21,7 @@ public enum EventSearchParameter implements SearchParameter {
 
   private final Class<?> type;
 
-  EventSearchParameter(Class type) {
+  ALAEventSearchParameter(Class type) {
     this.type = type;
   }
 

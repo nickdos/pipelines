@@ -3,6 +3,7 @@ package org.gbif.predicate.query;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.gbif.api.model.common.search.SearchParameter;
 import org.gbif.api.model.predicate.Predicate;
+import org.gbif.api.query.QueryVisitor;
 import org.junit.Test;
 
 public class OccurrenceQueryVisitorTest {
@@ -21,9 +22,9 @@ public class OccurrenceQueryVisitorTest {
             + "]"
             + "}";
     ObjectMapper om = new ObjectMapper();
-    om.addMixIn(SearchParameter.class, OccurrenceSearchParameter.class);
+    om.addMixIn(SearchParameter.class, ALAOccurrenceSearchParameter.class);
     Predicate predicate = om.readValue(json, Predicate.class);
-    QueryVisitor v = new OccurrenceSparkQueryVisitor();
+    QueryVisitor v = new ALAOccurrenceSparkQueryVisitor();
     String queryString = v.buildQuery(predicate);
     System.out.println(queryString);
   }

@@ -6,8 +6,8 @@ import java.util.UUID;
 import org.gbif.api.model.common.search.SearchParameter;
 import org.gbif.api.vocabulary.*;
 
-@JsonDeserialize(as = OccurrenceSearchParameter.class)
-public enum OccurrenceSearchParameter implements SearchParameter {
+@JsonDeserialize(as = ALAOccurrenceSearchParameter.class)
+public enum ALAOccurrenceSearchParameter implements SearchParameter {
   DATASET_KEY(String.class),
   YEAR(Integer.class),
   MONTH(Integer.class),
@@ -22,7 +22,6 @@ public enum OccurrenceSearchParameter implements SearchParameter {
   COORDINATE_UNCERTAINTY_IN_METERS(Double.class),
   COUNTRY(Country.class),
   CONTINENT(Continent.class),
-  PUBLISHING_COUNTRY(Country.class),
   ELEVATION(Double.class),
   DEPTH(Double.class),
   INSTITUTION_CODE(String.class),
@@ -97,7 +96,7 @@ public enum OccurrenceSearchParameter implements SearchParameter {
 
   private final Class<?> type;
 
-  OccurrenceSearchParameter(Class type) {
+  ALAOccurrenceSearchParameter(Class type) {
     this.type = type;
   }
 

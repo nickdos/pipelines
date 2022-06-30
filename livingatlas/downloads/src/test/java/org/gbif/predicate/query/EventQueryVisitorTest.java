@@ -3,6 +3,7 @@ package org.gbif.predicate.query;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.gbif.api.model.common.search.SearchParameter;
 import org.gbif.api.model.predicate.Predicate;
+import org.gbif.api.query.QueryVisitor;
 import org.junit.Test;
 
 public class EventQueryVisitorTest {
@@ -21,9 +22,9 @@ public class EventQueryVisitorTest {
             + "]"
             + "}";
     ObjectMapper om = new ObjectMapper();
-    om.addMixIn(SearchParameter.class, EventSearchParameter.class);
+    om.addMixIn(SearchParameter.class, ALAEventSearchParameter.class);
     Predicate predicate = om.readValue(json, Predicate.class);
-    QueryVisitor v = new EventSparkQueryVisitor();
+    QueryVisitor v = new ALAEventSparkQueryVisitor();
     String queryString = v.buildQuery(predicate);
     System.out.println(queryString);
   }
@@ -34,9 +35,9 @@ public class EventQueryVisitorTest {
     String json =
         "{\"type\": \"and\", \"predicates\": [{\"type\": \"in\", \"key\": \"STATE_PROVINCE\", \"values\": [\"Victoria\"]}]}";
     ObjectMapper om = new ObjectMapper();
-    om.addMixIn(SearchParameter.class, EventSearchParameter.class);
+    om.addMixIn(SearchParameter.class, ALAEventSearchParameter.class);
     Predicate predicate = om.readValue(json, Predicate.class);
-    QueryVisitor v = new EventSparkQueryVisitor();
+    QueryVisitor v = new ALAEventSparkQueryVisitor();
     String queryString = v.buildQuery(predicate);
     System.out.println(queryString);
   }

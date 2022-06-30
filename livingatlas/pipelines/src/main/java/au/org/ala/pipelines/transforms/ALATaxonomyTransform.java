@@ -160,6 +160,7 @@ public class ALATaxonomyTransform extends Transform<ExtendedRecord, ALATaxonReco
     Interpretation.from(source)
         .to(tr)
         .when(er -> !er.getCoreTerms().isEmpty())
+        .via(ALATaxonomyInterpreter::setParentId)
         .via(sourceCheck.andThen(interpret).andThen(resultCheck));
 
     // the id is null when there is an error in the interpretation. In these

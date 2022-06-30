@@ -304,4 +304,8 @@ public class BasicInterpreter {
   public static void interpretPreparations(ExtendedRecord er, BasicRecord br) {
     extractOptListValue(er, DwcTerm.preparations).ifPresent(br::setPreparations);
   }
+
+  public static void setParentId(ExtendedRecord er, BasicRecord br) {
+    Optional.ofNullable(er.getParentCoreId()).ifPresent(br::setParentId);
+  }
 }

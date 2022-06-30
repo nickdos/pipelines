@@ -7,28 +7,28 @@ import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.dwc.terms.GbifTerm;
 import org.gbif.dwc.terms.Term;
 
-public class EventSparkQueryVisitor extends SparkQueryVisitor {
+public class ALAEventSparkQueryVisitor extends SparkQueryVisitor {
   private static final Map<SearchParameter, ? extends Term> PARAMS_TO_TERMS =
       ImmutableMap.<SearchParameter, Term>builder()
-          .put(EventSearchParameter.YEAR, DwcTerm.year)
-          .put(EventSearchParameter.MONTH, DwcTerm.month)
-          .put(EventSearchParameter.STATE_PROVINCE, DwcTerm.stateProvince)
-          .put(EventSearchParameter.COUNTRY_CODE, DwcTerm.countryCode)
-          .put(EventSearchParameter.SAMPLING_PROTOCOL, DwcTerm.samplingProtocol)
-          .put(EventSearchParameter.EVENT_TYPE, GbifTerm.eventType)
+          .put(ALAEventSearchParameter.YEAR, DwcTerm.year)
+          .put(ALAEventSearchParameter.MONTH, DwcTerm.month)
+          .put(ALAEventSearchParameter.STATE_PROVINCE, DwcTerm.stateProvince)
+          .put(ALAEventSearchParameter.COUNTRY_CODE, DwcTerm.countryCode)
+          .put(ALAEventSearchParameter.SAMPLING_PROTOCOL, DwcTerm.samplingProtocol)
+          .put(ALAEventSearchParameter.EVENT_TYPE, GbifTerm.eventType)
           .build();
   private static final Map<SearchParameter, Term> ARRAY_TERMS =
       ImmutableMap.<SearchParameter, Term>builder()
-          .put(EventSearchParameter.SAMPLING_PROTOCOL, DwcTerm.samplingProtocol)
-          .put(EventSearchParameter.MEASUREMENT_TYPES, DwcTerm.measurementType)
+          .put(ALAEventSearchParameter.SAMPLING_PROTOCOL, DwcTerm.samplingProtocol)
+          .put(ALAEventSearchParameter.MEASUREMENT_TYPES, DwcTerm.measurementType)
           .build();
 
   private static final Map<SearchParameter, Term> DENORMED_TERMS =
       ImmutableMap.<SearchParameter, Term>builder()
-          .put(EventSearchParameter.STATE_PROVINCE, DwcTerm.stateProvince)
-          .put(EventSearchParameter.COUNTRY_CODE, DwcTerm.countryCode)
-          .put(EventSearchParameter.YEAR, DwcTerm.year)
-          .put(EventSearchParameter.MONTH, DwcTerm.month)
+          .put(ALAEventSearchParameter.STATE_PROVINCE, DwcTerm.stateProvince)
+          .put(ALAEventSearchParameter.COUNTRY_CODE, DwcTerm.countryCode)
+          .put(ALAEventSearchParameter.YEAR, DwcTerm.year)
+          .put(ALAEventSearchParameter.MONTH, DwcTerm.month)
           .build();
 
   @Override

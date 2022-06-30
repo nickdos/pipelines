@@ -6,7 +6,7 @@ import org.gbif.api.model.common.search.SearchParameter;
 import org.gbif.api.model.occurrence.search.OccurrenceSearchParameter;
 import org.gbif.dwc.terms.*;
 
-public class OccurrenceSparkQueryVisitor extends SparkQueryVisitor {
+public class ALAOccurrenceSparkQueryVisitor extends SparkQueryVisitor {
   private static final Map<SearchParameter, ? extends Term> PARAMS_TO_TERMS =
       ImmutableMap.<SearchParameter, Term>builder()
           .put(OccurrenceSearchParameter.DATASET_KEY, GbifTerm.datasetKey)

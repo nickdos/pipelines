@@ -137,17 +137,6 @@ public class ALAVerbatimToEventPipeline {
             .stateProvinceKvStoreSupplier(GeocodeKvStoreFactory.createStateProvinceSupplier(config))
             .biomeKvStoreSupplier(GeocodeKvStoreFactory.createBiomeSupplier(config))
             .create();
-    EventCoreTransform eventCoreTransform =
-        EventCoreTransform.builder()
-            .vocabularyServiceSupplier(
-                FileVocabularyFactory.builder()
-                    .config(config.getGbifConfig())
-                    .hdfsConfigs(hdfsConfigs)
-                    .build()
-                    .getInstanceSupplier())
-            .create();
-    ;
-    IdentifierTransform identifierTransform = transformsFactory.createIdentifierTransform();
     VerbatimTransform verbatimTransform = VerbatimTransform.create();
     ALATaxonomyTransform alaTaxonomyTransform =
         ALATaxonomyTransform.builder()
@@ -157,16 +146,24 @@ public class ALAVerbatimToEventPipeline {
                 ALANameCheckKVStoreFactory.getInstanceSupplier("kingdom", config))
             .dataResourceStoreSupplier(ALAAttributionKVStoreFactory.getInstanceSupplier(config))
             .create();
-
+    ALATemporalTransform temporalTransform = ALATemporalTransform.builder().create();
     MultimediaTransform multimediaTransform = transformsFactory.createMultimediaTransform();
     AudubonTransform audubonTransform = transformsFactory.createAudubonTransform();
     ImageTransform imageTransform = transformsFactory.createImageTransform();
-    ALATemporalTransform temporalTransform = ALATemporalTransform.builder().create();
-    // Extension
+    EventCoreTransform eventCoreTransform =
+        EventCoreTransform.builder()
+            .vocabularyServiceSupplier(
+                FileVocabularyFactory.builder()
+                    .config(config.getGbifConfig())
+                    .hdfsConfigs(hdfsConfigs)
+                    .build()
+                    .getInstanceSupplier())
+            .create();
+    IdentifierTransform identifierTransform = transformsFactory.createIdentifierTransform();
     MeasurementOrFactTransform measurementOrFactTransform =
         MeasurementOrFactTransform.builder().create();
-
     log.info("Creating beam pipeline");
+
     PCollection<MetadataRecord> metadataRecord =
         p.apply("Create metadata collection", Create.of(options.getDatasetId()))
             .apply("Interpret metadata", metadataTransform.interpret());

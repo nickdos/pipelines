@@ -73,10 +73,18 @@ public class LocationTransform extends Transform<ExtendedRecord, LocationRecord>
 
   /** Maps {@link LocationRecord} to key value, where key is {@link LocationRecord#getId} */
   public MapElements<LocationRecord, KV<String, LocationRecord>> toKv() {
-    return MapElements.into(new TypeDescriptor<KV<String, LocationRecord>>() {})
-        .via((LocationRecord lr) -> KV.of(lr.getId(), lr));
+    return asKv(false);
   }
 
+  /** Maps {@link LocationRecord} to key value, where key is {@link LocationRecord#getParentId} */
+  public MapElements<LocationRecord, KV<String, LocationRecord>> toParentKv() {
+    return asKv(true);
+  }
+
+  private MapElements<LocationRecord, KV<String, LocationRecord>> asKv(boolean useParentId) {
+    return MapElements.into(new TypeDescriptor<KV<String, LocationRecord>>() {})
+        .via((LocationRecord lr) -> KV.of(useParentId ? lr.getParentId() : lr.getId(), lr));
+  }
   /** Beam @Setup initializes resources */
   @SneakyThrows
   @Setup
@@ -176,6 +184,7 @@ public class LocationTransform extends Transform<ExtendedRecord, LocationRecord>
         .via(ALALocationInterpreter.validateStateProvince(stateProvinceParser))
         .via(LocationInterpreter::interpretLocality)
         .via(LocationInterpreter::interpretFootprintWKT)
+        .via(LocationInterpreter::setParentId)
         .via(r -> this.incCounter())
         .getOfNullable();
   }

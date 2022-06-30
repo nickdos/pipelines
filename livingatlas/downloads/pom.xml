@@ -114,8 +114,9 @@
   </build>
   <dependencies>
     <dependency>
-      <groupId>org.gbif.pipelines</groupId>
-      <artifactId>models</artifactId>
+      <groupId>org.gbif.predicates</groupId>
+      <artifactId>sql-predicates</artifactId>
+      <version>0.1-SNAPSHOT</version>
     </dependency>
     <!-- SCALA -->
     <dependency>
