@@ -281,7 +281,7 @@ object DownloadDwCAPipeline {
     val exportFields = (primitiveFields.map { field => field.name } ++ stringArrayFields.map { field => field.name })
       .filter(!SKIPPED_FIELDS.contains(_))
 
-    val fields = Array(col("core.id").as("id")) ++ exportFields.map(col(_))
+    val fields = Array(col("core.id").as("eventID")) ++ exportFields.map(col(_))
 
     var occDFCoalesce = df.select(fields: _*).coalesce(1)
 
@@ -414,7 +414,7 @@ object DownloadDwCAPipeline {
     val extensionFileName = extensionUri.substring(extensionUri.lastIndexOf("/") + 1).toLowerCase
     <extension rowType={extensionUri} encoding="UTF-8" fieldsTerminatedBy="\t" linesTerminatedBy="\r\n" fieldsEnclosedBy="&quot;" ignoreHeaderLines="1">
       <files>
-        <location>{extensionFileName}.txt</location>
+        <location>verbatim_{extensionFileName}.txt</location>
       </files>
       <coreid index="0"/>
       { if (false) <field index="0" term="http://rs.tdwg.org/dwc/terms/eventID"/> }
