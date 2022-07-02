@@ -1,11 +1,12 @@
 package org.gbif.pipelines.events
+
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.types.{ArrayType, AtomicType, BooleanType, DoubleType, StringType, StructType}
+import org.apache.spark.sql.types.{ArrayType, BooleanType, DoubleType, StringType, StructType}
 import org.apache.spark.sql.{Column, DataFrame, Dataset, Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 import org.gbif.api.model.common.search.SearchParameter
@@ -15,10 +16,7 @@ import org.gbif.predicate.query.{ALAEventSearchParameter, ALAEventSparkQueryVisi
 
 import java.io.{BufferedInputStream, File, FileInputStream, FileOutputStream}
 import java.net.{URI, URL}
-import java.util
-import java.util.UUID
 import java.util.zip.{ZipEntry, ZipOutputStream}
-import scala.collection.mutable
 import scala.xml.Elem
 
 /**
@@ -48,7 +46,9 @@ object DownloadDwCAPipeline {
     }
 
 //    val args = Array("dr18391", "hdfs://localhost:9000/pipelines-data", "1", "generate", "false", "{}")
+    // val args = Array("dr18391", "hdfs:///pipelines-data", "1", "generate", "false", "{}")
 
+    import java.util.UUID
     val datasetId = args(0)
     val hdfsPath = args(1)
     val attempt = args(2)
@@ -107,10 +107,6 @@ object DownloadDwCAPipeline {
     val denormDF = spark.read.format("avro").
       load(s"${hdfsPath}/${datasetId}/${attempt}/event/event_hierarchy/*.avro").as("Denorm")
 
-    System.out.println("Load verbatim")
-    val verbatimDF = spark.read.format("avro").
-      load(s"${hdfsPath}/${datasetId}/${attempt}/verbatim.avro").as("Verbatim")
-
     System.out.println("Join")
     val downloadDF = eventCoreDF.
       join(locationDF, col("Core.id") === col("Location.id"), "inner").
@@ -128,6 +124,7 @@ object DownloadDwCAPipeline {
     }
 
     // generate interpreted event export
+    System.out.println("Export interpreted event data")
     val (eventExportDF, eventFields) = generateInterpretedExportDF(filterDownloadDF)
     eventExportDF
       .write
@@ -137,6 +134,13 @@ object DownloadDwCAPipeline {
       .csv(exportPath)
 
     cleanupFileExport(jobID, "Event")
+
+    // load the verbatim DF
+    val verbatimDF = spark.read.format("avro").
+        load(s"${hdfsPath}/${datasetId}/${attempt}/verbatim.avro").as("Verbatim")
+
+    // export the supplied core verbatim
+    val verbatimCoreFields = exportVerbatimCore(jobID, spark, verbatimDF, filterDownloadDF)
 
     // export the supplied extensions verbatim
     val verbatimExtensionsForMeta = exportVerbatimExtensions(jobID, spark, verbatimDF, filterDownloadDF)
@@ -151,10 +155,32 @@ object DownloadDwCAPipeline {
       DwcTerm.Event.qualifiedName(),
       eventFields,
       occurrenceFields,
+      verbatimCoreFields,
       verbatimExtensionsForMeta
     )
 
     println("Export complete")
+  }
+
+  private def exportVerbatimCore(jobID: String, spark: SparkSession, verbatimDF: Dataset[Row], filterDownloadDF: DataFrame) = {
+
+    val dfWithExtensions = filterDownloadDF.
+      join(verbatimDF, col("Core.id") === col("Verbatim.id"), "inner")
+
+    val coreFields = getCoreFields(dfWithExtensions, spark).filter(!_.endsWith("eventID"))
+    val columns = Array(col("core.id").as("eventID")) ++ coreFields.map {
+      fieldName => col("coreTerms.`" + fieldName+"`").as(fieldName.substring(fieldName.lastIndexOf("/") + 1))
+    }
+    val coreForExportDF = dfWithExtensions.select(columns:_*)
+    coreForExportDF.select("*")
+      .coalesce(1).write
+      .option("header", "true")
+      .option("sep", "\t")
+      .mode("overwrite")
+      .csv(workingDirectory + jobID + "/Verbatim_Event" )
+    cleanupFileExport(jobID, "Verbatim_Event")
+
+   coreFields
   }
 
   private def exportVerbatimExtensions(jobID: String, spark: SparkSession, verbatimDF: Dataset[Row], filterDownloadDF: DataFrame) = {
@@ -232,6 +258,7 @@ object DownloadDwCAPipeline {
       val occLocationDF = spark.read.format("avro").
         load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/location/*.avro").as("OccLocation")
 
+      System.out.println("Create occurrence join DF")
       val occDF = {
         filterDownloadDF.select(col("Core.id")).
           join(occBasicDF, col("Core.id") === col("OccBasic.parentId"), "inner").
@@ -240,8 +267,10 @@ object DownloadDwCAPipeline {
           join(occTemporalDF, col("Core.id") === col("OccTemporal.parentId"), "inner")
       }
 
+      System.out.println("Generate interpreted occurrence DF for export")
       val (exportDF, fields) = generateInterpretedExportDF(occDF)
 
+      System.out.println("Export interpreted occurrence data")
       exportDF.write
         .option("header", "true")
         .option("sep", "\t")
@@ -297,11 +326,12 @@ object DownloadDwCAPipeline {
                         coreTermType: String,
                         coreFieldList:Array[String],
                         occurrenceFieldList:Array[String],
+                        verbatimCoreFields:Array[String],
                         extensionsForMeta: Map[String, Array[String]]) = {
     // write the XML
     import scala.collection.JavaConversions._
 
-    val metaXml = createMeta(coreTermType, coreFieldList, occurrenceFieldList, extensionsForMeta)
+    val metaXml = createMeta(coreTermType, coreFieldList, occurrenceFieldList, verbatimCoreFields, extensionsForMeta)
 
     scala.xml.XML.save(workingDirectory + jobID + "/meta.xml", metaXml)
 
@@ -423,7 +453,7 @@ object DownloadDwCAPipeline {
     </extension>
   }
 
-  def createMeta(coreURI:String, coreFields:Seq[String], occurrenceFields:Array[String], extensionsForMeta:Map[String, Array[String]]): Elem = {
+  def createMeta(coreURI:String, coreFields:Seq[String], occurrenceFields:Array[String], verbatimCoreFields:Array[String], extensionsForMeta:Map[String, Array[String]]): Elem = {
     val coreFileName = coreURI.substring(coreURI.lastIndexOf("/") + 1).toLowerCase
     val metaXml = <archive xmlns="http://rs.tdwg.org/dwc/text/">
       <core rowType={coreURI} encoding="UTF-8" fieldsTerminatedBy="\t" linesTerminatedBy="\r\n" fieldsEnclosedBy="&quot;" ignoreHeaderLines="1">
@@ -434,6 +464,7 @@ object DownloadDwCAPipeline {
         {coreFields.zipWithIndex.map { case (uri, index) => <field index={index.toString} term={generateCoreFieldMetaName(uri)}/>} }
       </core>
       { generateInterpretedExtension(DwcTerm.Occurrence.qualifiedName(), occurrenceFields) }
+      { generateVerbatimExtension(DwcTerm.Event.qualifiedName(), verbatimCoreFields) }
       { extensionsForMeta.map { case(extensionUri, fields) => generateVerbatimExtension(extensionUri, fields) } }
     </archive>
     metaXml
@@ -457,15 +488,34 @@ object DownloadDwCAPipeline {
       col(s"""extensions""").as("the_extensions")).toDF
 
     val rowRDD = extensionsDF.rdd.map(row => extensionFieldNameRow(row, fieldNameStructureSchema)).flatMap(list => list)
-    val df = spark.sqlContext.createDataFrame(rowRDD , fieldNameStructureSchema)
 
+    val fieldNameDF = spark.sqlContext.createDataFrame(rowRDD , fieldNameStructureSchema)
+
+    val rows = fieldNameDF.distinct().select(col("fieldName")).head(1000)
+    rows.map(_.getString(0))
+  }
+
+  def getCoreFields(verbatimDF:DataFrame, spark:SparkSession): Array[String] = {
+
+    import org.apache.spark.sql.types._
+    val fieldNameStructureSchema:StructType = new StructType().add("fieldName", StringType)
+
+    val coreDF = verbatimDF.select(
+      col(s"""coreTerms""").
+        as("coreTerms")).toDF
+
+    val rowRDD = coreDF.rdd.map { row =>
+      coreRecordToFieldNameRow(row, fieldNameStructureSchema)
+    }.flatMap(list => list)
+
+    val df = spark.sqlContext.createDataFrame(rowRDD, fieldNameStructureSchema)
     val rows = df.distinct().select(col("fieldName")).head(1000)
     rows.map(_.getString(0))
   }
 
   def getExtensionFields(joined_df:DataFrame, extension:String, spark:SparkSession): Array[String] = {
     val fieldNameStructureSchema = new StructType()
-      .add("fieldName",StringType)
+      .add("fieldName", StringType)
 
     val extensionDF = joined_df.select(
       col(s"""extensions.`${extension}`""").
@@ -477,9 +527,20 @@ object DownloadDwCAPipeline {
     rows.map(_.getString(0))
   }
 
+  def coreRecordToFieldNameRow(row:Row, sqlType:StructType): Seq[Row] = {
+    val extensionUris = row.get(0).asInstanceOf[Map[String, Any]].keySet
+    extensionUris.map(fieldName => new GenericRowWithSchema(Array(fieldName), sqlType)).toSeq
+  }
+
   def extensionFieldNameRow(row:Row, sqlType:StructType): Seq[Row] = {
     val extensionUris = row.get(0).asInstanceOf[Map[String, Any]].keySet
     extensionUris.map(fieldName => new GenericRowWithSchema(Array(fieldName), sqlType)).toSeq
+  }
+
+  def genericCoreRecordToFieldNameRow(row:Row, sqlType:StructType): Set[GenericRowWithSchema] = {
+    val elements = row.get(0).asInstanceOf[Map[String, String] ]
+    val fieldNames = elements.keySet.flatten
+    fieldNames.map(fieldName => new GenericRowWithSchema(Array(fieldName), sqlType))
   }
 
   def genericRecordToFieldNameRow(row:Row, sqlType:StructType): Seq[Row] = {
