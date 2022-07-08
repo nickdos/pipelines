@@ -244,31 +244,31 @@ object DownloadDwCAPipeline {
 
       System.out.println("Load basic  for occurrences")
       val occBasicDF = spark.read.format("avro").
-        load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/basic/*.avro").as("OccBasic")
+        load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/basic/*.avro").as("OccBasic").filter("parentId is NOT NULL")
 
       System.out.println("Load occurrences")
       val occTaxonDF = spark.read.format("avro").
-        load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/ala_taxonomy/*.avro").as("OccTaxon")
+        load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/ala_taxonomy/*.avro").as("OccTaxon").filter("parentId is NOT NULL")
 
       System.out.println("Load temporal  for occurrences")
       val occTemporalDF = spark.read.format("avro").
-        load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/temporal/*.avro").as("OccTemporal")
+        load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/temporal/*.avro").as("OccTemporal").filter("parentId is NOT NULL")
 
       System.out.println("Load location for occurrences")
       val occLocationDF = spark.read.format("avro").
-        load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/location/*.avro").as("OccLocation")
+        load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/location/*.avro").as("OccLocation").filter("parentId is NOT NULL")
 
       System.out.println("Create occurrence join DF")
-      val occDF = {
-        filterDownloadDF.select(col("Core.id")).
-          join(occBasicDF, col("Core.id") === col("OccBasic.parentId"), "inner").
-          join(occTaxonDF, col("Core.id") === col("OccTaxon.parentId"), "inner").
-          join(occLocationDF, col("Core.id") === col("OccLocation.parentId"), "inner").
-          join(occTemporalDF, col("Core.id") === col("OccTemporal.parentId"), "inner")
-      }
+      val occDF = occBasicDF.
+          join(occTaxonDF, col("OccBasic.id") === col("OccTaxon.id"), "inner").
+          join(occLocationDF, col("OccBasic.id") === col("OccLocation.id"), "inner").
+          join(occTemporalDF, col("OccBasic.id") === col("OccTemporal.id"), "inner")
+
+      val joinOccDF = filterDownloadDF.select(col("Core.id")).
+        join(occDF, col("Core.id") === col("OccBasic.parentId"), "inner")
 
       System.out.println("Generate interpreted occurrence DF for export")
-      val (exportDF, fields) = generateInterpretedExportDF(occDF)
+      val (exportDF, fields) = generateInterpretedExportDF(joinOccDF)
 
       System.out.println("Export interpreted occurrence data")
       exportDF.write
