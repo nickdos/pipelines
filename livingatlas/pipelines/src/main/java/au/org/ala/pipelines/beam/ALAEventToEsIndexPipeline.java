@@ -11,8 +11,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
+import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.io.AvroIO;
 import org.apache.beam.sdk.io.elasticsearch.ElasticsearchIO;
 import org.apache.beam.sdk.io.fs.EmptyMatchTreatment;
@@ -23,10 +27,12 @@ import org.apache.beam.sdk.transforms.join.CoGroupByKey;
 import org.apache.beam.sdk.transforms.join.KeyedPCollectionTuple;
 import org.apache.beam.sdk.values.*;
 import org.gbif.dwc.terms.DwcTerm;
+import org.gbif.pipelines.common.PipelinesVariables;
 import org.gbif.pipelines.common.beam.metrics.MetricsHandler;
 import org.gbif.pipelines.common.beam.options.EsIndexingPipelineOptions;
 import org.gbif.pipelines.common.beam.options.PipelinesOptionsFactory;
 import org.gbif.pipelines.common.beam.utils.PathBuilder;
+import org.gbif.pipelines.core.pojo.HdfsConfigs;
 import org.gbif.pipelines.io.avro.*;
 import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
 import org.gbif.pipelines.transforms.converters.ParentJsonTransform;
@@ -70,9 +76,9 @@ import org.slf4j.MDC;
  *
  * }</pre>
  */
+@Slf4j
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ALAEventToEsIndexPipeline {
-
-  private static final DwcTerm CORE_TERM = DwcTerm.Event;
 
   public static void main(String[] args) throws IOException {
     String[] combinedArgs = new CombinedYamlConfiguration(args).toArgs("general", "elastic");
@@ -95,18 +101,27 @@ public class ALAEventToEsIndexPipeline {
 
     ElasticsearchTools.createIndexAndAliasForDefault(options);
 
-    System.out.println("Adding step 1: Options");
+    log.info("Adding step 1: Options");
     UnaryOperator<String> pathFn =
-        t -> PathBuilder.buildPathInterpretUsingTargetPath(options, CORE_TERM, t, ALL_AVRO);
+        t -> PathBuilder.buildPathInterpretUsingTargetPath(options, DwcTerm.Event, t, ALL_AVRO);
 
     UnaryOperator<String> occurrencesPathFn =
         t ->
             PathBuilder.buildPathInterpretUsingTargetPath(options, DwcTerm.Occurrence, t, ALL_AVRO);
 
+    HdfsConfigs hdfsConfigs =
+        HdfsConfigs.create(options.getHdfsSiteConfig(), options.getCoreSiteConfig());
+    String occurrencesMetadataPath =
+        PathBuilder.buildDatasetAttemptPath(
+            options, PipelinesVariables.Pipeline.VERBATIM_TO_OCCURRENCE + ".yml", false);
+
+    //    boolean datasetHasOccurrences = FsUtils.fileExists(hdfsConfigs, occurrencesMetadataPath);
+    boolean datasetHasOccurrences = true;
+
     options.setAppName("Event indexing of " + options.getDatasetId());
     Pipeline p = pipelinesFn.apply(options);
 
-    System.out.println("Adding step 2: Creating transformations");
+    log.info("Adding step 2: Creating transformations");
     MetadataTransform metadataTransform = MetadataTransform.builder().create();
     // Core
     EventCoreTransform eventCoreTransform = EventCoreTransform.builder().create();
@@ -116,6 +131,7 @@ public class ALAEventToEsIndexPipeline {
     TemporalTransform temporalTransform = TemporalTransform.builder().create();
     LocationTransform locationTransform = LocationTransform.builder().create();
     LocationTransform parentLocationTransform = LocationTransform.builder().create();
+
     MeasurementOrFactTransform measurementOrFactTransform =
         MeasurementOrFactTransform.builder().create();
 
@@ -194,7 +210,7 @@ public class ALAEventToEsIndexPipeline {
 
     System.out.println("Adding step 3: Converting into a json object");
     SingleOutput<KV<String, CoGbkResult>, String> eventJsonDoFn =
-        ParentJsonTransform.builder()
+            ALAParentJsonTransform.builder()
             .extendedRecordTag(verbatimTransform.getTag())
             .identifierRecordTag(identifierTransform.getTag())
             .eventCoreRecordTag(eventCoreTransform.getTag())
@@ -210,7 +226,7 @@ public class ALAEventToEsIndexPipeline {
             .build()
             .converter();
 
-    PCollection<String> jsonCollection =
+    PCollection<String> eventJsonCollection =
         KeyedPCollectionTuple
             // Core
             .of(eventCoreTransform.getTag(), eventCoreCollection)
@@ -227,14 +243,29 @@ public class ALAEventToEsIndexPipeline {
             .and(measurementOrFactTransform.getTag(), measurementOrFactCollection)
             // denorm
             .and(denormalisedEventTag, denormCollection)
-            //             Derived metadata
+            // derived metadata
             .and(DerivedMetadataTransform.tag(), derivedMetadataRecordCollection)
             // Apply
             .apply("Grouping objects", CoGroupByKey.create())
             .apply("Merging to json", eventJsonDoFn);
 
-    System.out.println("Adding step 4: Elasticsearch indexing");
+    PCollection<String> occurrenceJsonCollection =
+        datasetHasOccurrences
+            ? ALAOccurrenceToEsIndexPipeline.IndexingTransform.builder()
+                .pipeline(p)
+                .pathFn(occurrencesPathFn)
+                .asParentChildRecord(true)
+                .build()
+                .apply()
+            : p.apply("Create empty occurrenceJsonCollection", Create.empty(StringUtf8Coder.of()));
 
+    // Merge events and occurrences
+    PCollection<String> jsonCollection =
+        PCollectionList.of(eventJsonCollection)
+            .and(occurrenceJsonCollection)
+            .apply("Join event and occurrence Json records", Flatten.pCollections());
+
+    log.info("Adding step 6: Elasticsearch indexing");
     ElasticsearchIO.ConnectionConfiguration esConfig =
         ElasticsearchIO.ConnectionConfiguration.create(
             options.getEsHosts(), options.getEsIndexName(), "_doc");

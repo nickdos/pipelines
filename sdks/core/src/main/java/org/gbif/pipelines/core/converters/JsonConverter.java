@@ -101,7 +101,7 @@ public class JsonConverter {
     return Optional.ofNullable(epoch).map(DATE_FN::apply).map(LocalDateTime::toString);
   }
 
-  protected static List<String> convertFieldAll(ExtendedRecord extendedRecord) {
+  public static List<String> convertFieldAll(ExtendedRecord extendedRecord) {
     Set<String> result = new HashSet<>();
 
     extendedRecord.getCoreTerms().entrySet().stream()
@@ -126,7 +126,7 @@ public class JsonConverter {
         .collect(Collectors.toList());
   }
 
-  protected static List<String> convertExtensions(ExtendedRecord extendedRecord) {
+  public static List<String> convertExtensions(ExtendedRecord extendedRecord) {
     return extendedRecord.getExtensions().entrySet().stream()
         .filter(e -> e.getValue() != null && !e.getValue().isEmpty())
         .map(Entry::getKey)
@@ -134,7 +134,7 @@ public class JsonConverter {
         .collect(Collectors.toList());
   }
 
-  protected static VerbatimRecord convertVerbatimRecord(ExtendedRecord extendedRecord) {
+  public static VerbatimRecord convertVerbatimRecord(ExtendedRecord extendedRecord) {
     return VerbatimRecord.newBuilder()
         .setCore(extendedRecord.getCoreTerms())
         .setParentCoreId(extendedRecord.getParentCoreId())
@@ -142,7 +142,7 @@ public class JsonConverter {
         .build();
   }
 
-  protected static Optional<String> convertToMultivalue(List<String> list) {
+  public static Optional<String> convertToMultivalue(List<String> list) {
     return list != null && !list.isEmpty() ? Optional.of(String.join("|", list)) : Optional.empty();
   }
 
@@ -159,7 +159,7 @@ public class JsonConverter {
         .collect(Collectors.toList());
   }
 
-  protected static Optional<VocabularyConcept> convertVocabularyConcept(
+  public static Optional<VocabularyConcept> convertVocabularyConcept(
       org.gbif.pipelines.io.avro.VocabularyConcept concepts) {
     if (concepts == null) {
       return Optional.empty();

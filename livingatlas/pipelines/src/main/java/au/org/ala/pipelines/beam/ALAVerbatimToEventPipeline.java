@@ -38,8 +38,8 @@ import org.gbif.pipelines.common.beam.utils.PathBuilder;
 import org.gbif.pipelines.core.pojo.HdfsConfigs;
 import org.gbif.pipelines.core.utils.FsUtils;
 import org.gbif.pipelines.factory.FileVocabularyFactory;
+import org.gbif.pipelines.io.avro.ALAMetadataRecord;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
-import org.gbif.pipelines.io.avro.MetadataRecord;
 import org.gbif.pipelines.transforms.core.*;
 import org.gbif.pipelines.transforms.extension.AudubonTransform;
 import org.gbif.pipelines.transforms.extension.ImageTransform;
@@ -125,8 +125,8 @@ public class ALAVerbatimToEventPipeline {
     TransformsFactory transformsFactory = TransformsFactory.create(options);
 
     // Metadata
-    MetadataTransform metadataTransform =
-        MetadataTransform.builder()
+    ALAMetadataTransform metadataTransform =
+        ALAMetadataTransform.builder()
             .dataResourceKvStoreSupplier(ALAAttributionKVStoreFactory.getInstanceSupplier(config))
             .datasetId(datasetId)
             .create();
@@ -164,7 +164,7 @@ public class ALAVerbatimToEventPipeline {
         MeasurementOrFactTransform.builder().create();
     log.info("Creating beam pipeline");
 
-    PCollection<MetadataRecord> metadataRecord =
+    PCollection<ALAMetadataRecord> metadataRecord =
         p.apply("Create metadata collection", Create.of(options.getDatasetId()))
             .apply("Interpret metadata", metadataTransform.interpret());
 

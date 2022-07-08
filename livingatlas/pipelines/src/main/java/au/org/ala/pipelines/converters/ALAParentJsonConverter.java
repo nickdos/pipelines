@@ -1,46 +1,30 @@
-package org.gbif.pipelines.core.converters;
+package au.org.ala.pipelines.converters;
 
 import static org.gbif.pipelines.core.utils.ModelUtils.extractOptValue;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.gbif.api.vocabulary.License;
 import org.gbif.dwc.terms.DwcTerm;
+import org.gbif.pipelines.core.converters.JsonConverter;
 import org.gbif.pipelines.core.utils.HashConverter;
-import org.gbif.pipelines.io.avro.DenormalisedEvent;
-import org.gbif.pipelines.io.avro.EventCoreRecord;
-import org.gbif.pipelines.io.avro.ExtendedRecord;
-import org.gbif.pipelines.io.avro.IdentifierRecord;
-import org.gbif.pipelines.io.avro.LocationRecord;
-import org.gbif.pipelines.io.avro.MeasurementOrFact;
-import org.gbif.pipelines.io.avro.MeasurementOrFactRecord;
-import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.MultimediaRecord;
-import org.gbif.pipelines.io.avro.TemporalRecord;
-import org.gbif.pipelines.io.avro.grscicoll.GrscicollRecord;
-import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
-import org.gbif.pipelines.io.avro.json.EventJsonRecord;
-import org.gbif.pipelines.io.avro.json.JoinRecord;
-import org.gbif.pipelines.io.avro.json.MetadataJsonRecord;
-import org.gbif.pipelines.io.avro.json.OccurrenceJsonRecord;
+import org.gbif.pipelines.io.avro.*;
+import org.gbif.pipelines.io.avro.json.*;
 import org.gbif.pipelines.io.avro.json.Parent;
-import org.gbif.pipelines.io.avro.json.ParentJsonRecord;
+import org.gbif.pipelines.io.avro.json.VocabularyConcept;
 
 @Slf4j
 @SuperBuilder
-public abstract class ParentJsonConverter {
+public class ALAParentJsonConverter {
 
-  protected final MetadataRecord metadata;
+  protected final ALAMetadataRecord metadata;
   protected final IdentifierRecord identifier;
   protected final EventCoreRecord eventCore;
   protected final TemporalRecord temporal;
   protected final LocationRecord location;
-  protected final GrscicollRecord grscicoll;
   protected final MultimediaRecord multimedia;
   protected final ExtendedRecord verbatim;
   protected final DerivedMetadataRecord derivedMetadata;
@@ -72,7 +56,7 @@ public abstract class ParentJsonConverter {
         .setId(occurrenceJsonRecord.getId())
         .setInternalId(
             HashConverter.getSha1(
-                metadata.getDatasetKey(),
+                metadata.getDataResourceUid(),
                 occurrenceJsonRecord.getVerbatim().getParentCoreId(),
                 occurrenceJsonRecord.getOccurrenceId()))
         .setJoinRecordBuilder(
@@ -80,7 +64,7 @@ public abstract class ParentJsonConverter {
                 .setName("occurrence")
                 .setParent(
                     HashConverter.getSha1(
-                        metadata.getDatasetKey(),
+                        metadata.getDataResourceUid(),
                         occurrenceJsonRecord.getVerbatim().getParentCoreId())))
         .setOccurrence(occurrenceJsonRecord)
         .setMetadataBuilder(mapMetadataJsonRecord())
@@ -92,16 +76,12 @@ public abstract class ParentJsonConverter {
     ParentJsonRecord.Builder builder =
         ParentJsonRecord.newBuilder()
             .setId(verbatim.getId())
-            .setCrawlId(metadata.getCrawlId())
-            .setInternalId(identifier.getInternalId())
-            .setUniqueKey(identifier.getUniqueKey())
             .setMetadataBuilder(mapMetadataJsonRecord());
 
     mapCreated(builder);
     mapDerivedMetadata(builder);
 
     JsonConverter.convertToDate(identifier.getFirstLoaded()).ifPresent(builder::setFirstLoaded);
-    JsonConverter.convertToDate(metadata.getLastCrawled()).ifPresent(builder::setLastCrawled);
 
     return builder;
   }
@@ -127,18 +107,8 @@ public abstract class ParentJsonConverter {
 
   private MetadataJsonRecord.Builder mapMetadataJsonRecord() {
     return MetadataJsonRecord.newBuilder()
-        .setDatasetKey(metadata.getDatasetKey())
-        .setDatasetTitle(metadata.getDatasetTitle())
-        .setDatasetPublishingCountry(metadata.getDatasetPublishingCountry())
-        .setEndorsingNodeKey(metadata.getEndorsingNodeKey())
-        .setInstallationKey(metadata.getInstallationKey())
-        .setHostingOrganizationKey(metadata.getHostingOrganizationKey())
-        .setNetworkKeys(metadata.getNetworkKeys())
-        .setProgrammeAcronym(metadata.getProgrammeAcronym())
-        .setProjectId(metadata.getProjectId())
-        .setProtocol(metadata.getProtocol())
-        .setPublisherTitle(metadata.getPublisherTitle())
-        .setPublishingOrganizationKey(metadata.getPublishingOrganizationKey());
+        .setDatasetKey(metadata.getDataResourceUid())
+        .setDatasetTitle(metadata.getDataResourceName());
   }
 
   private void mapDenormalisedEvent(EventJsonRecord.Builder builder) {
@@ -219,32 +189,41 @@ public abstract class ParentJsonConverter {
         .setDatasetID(eventCore.getDatasetID())
         .setDatasetName(eventCore.getDatasetName())
         .setSamplingProtocol(eventCore.getSamplingProtocol())
-            // Parent lineage currently causing indexing errors
         //        .setParentsLineage(convertParents(eventCore.getParentsLineage()))
         .setParentEventID(eventCore.getParentEventID())
         .setLocationID(eventCore.getLocationID());
 
-    if (eventCore.getLocationID() == null
-        && location.getDecimalLatitude() != null
-        && location.getDecimalLongitude() != null) {
-      builder.setLocationID(
-          Math.abs(location.getDecimalLatitude())
-              + (location.getDecimalLatitude() > 0 ? "N" : "S")
-              + ", "
-              + Math.abs(location.getDecimalLongitude())
-              + (location.getDecimalLongitude() > 0 ? "E" : "W"));
-    }
-
     // Vocabulary
-    JsonConverter.convertVocabularyConcept(eventCore.getEventType())
-        .ifPresent(builder::setEventType);
+    convertVocabularyConcept(eventCore.getEventType()).ifPresent(builder::setEventType);
 
     // License
-    JsonConverter.convertLicense(eventCore.getLicense()).ifPresent(builder::setLicense);
+    convertLicense(eventCore.getLicense()).ifPresent(builder::setLicense);
 
     // Multivalue fields
-    JsonConverter.convertToMultivalue(eventCore.getSamplingProtocol())
+    convertToMultivalue(eventCore.getSamplingProtocol())
         .ifPresent(builder::setSamplingProtocolJoined);
+  }
+
+  protected static Optional<String> convertToMultivalue(List<String> list) {
+    return list != null && !list.isEmpty() ? Optional.of(String.join("|", list)) : Optional.empty();
+  }
+
+  protected static Optional<String> convertLicense(String license) {
+    return Optional.ofNullable(license)
+        .filter(l -> !l.equals(License.UNSPECIFIED.name()))
+        .filter(l -> !l.equals(License.UNSUPPORTED.name()));
+  }
+
+  protected static Optional<VocabularyConcept> convertVocabularyConcept(
+      org.gbif.pipelines.io.avro.VocabularyConcept concepts) {
+    if (concepts == null) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        VocabularyConcept.newBuilder()
+            .setConcept(concepts.getConcept())
+            .setLineage(concepts.getLineage())
+            .build());
   }
 
   private void mapTemporalRecord(EventJsonRecord.Builder builder) {
@@ -300,7 +279,7 @@ public abstract class ParentJsonConverter {
     JsonConverter.convertGadm(location.getGadm()).ifPresent(builder::setGadm);
   }
 
-  protected abstract void mapTaxonRecord(EventJsonRecord.Builder builder);
+  protected void mapTaxonRecord(EventJsonRecord.Builder builder) {}
 
   private void mapMultimediaRecord(EventJsonRecord.Builder builder) {
     builder
@@ -325,7 +304,7 @@ public abstract class ParentJsonConverter {
   }
 
   private void mapExtendedRecord(EventJsonRecord.Builder builder) {
-    builder.setExtensions(JsonConverter.convertExtensions(verbatim));
+    //    builder.setExtensions(JsonConverter.convertExtensions(verbatim));
 
     // Set raw as indexed
     extractOptValue(verbatim, DwcTerm.eventID).ifPresent(builder::setEventID);
@@ -337,10 +316,10 @@ public abstract class ParentJsonConverter {
   }
 
   private void mapIssues(EventJsonRecord.Builder builder) {
-    JsonConverter.mapIssues(
-        Arrays.asList(metadata, eventCore, temporal, location, multimedia),
-        builder::setIssues,
-        builder::setNotIssues);
+    //    JsonConverter.mapIssues(
+    //        Arrays.asList(metadata, eventCore, temporal, location, multimedia),
+    //        builder::setIssues,
+    //        builder::setNotIssues);
   }
 
   private void mapCreated(ParentJsonRecord.Builder builder) {
