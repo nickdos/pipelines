@@ -78,6 +78,7 @@ public class ALAOccurrenceJsonTransform implements Serializable {
   private static final long serialVersionUID = 1279313931024806171L;
 
   // Core
+  @NonNull private final TupleTag<ALAUUIDRecord> uuidRecordTag;
   @NonNull private final TupleTag<ExtendedRecord> extendedRecordTag;
   @NonNull private final TupleTag<BasicRecord> basicRecordTag;
   @NonNull private final TupleTag<TemporalRecord> temporalRecordTag;
@@ -104,6 +105,8 @@ public class ALAOccurrenceJsonTransform implements Serializable {
 
             // Core
             ALAMetadataRecord mdr = c.sideInput(metadataView);
+            ALAUUIDRecord uuidr =
+                v.getOnly(uuidRecordTag, ALAUUIDRecord.newBuilder().setId(k).build());
             ExtendedRecord er =
                 v.getOnly(extendedRecordTag, ExtendedRecord.newBuilder().setId(k).build());
             BasicRecord br = v.getOnly(basicRecordTag, BasicRecord.newBuilder().setId(k).build());
@@ -120,6 +123,7 @@ public class ALAOccurrenceJsonTransform implements Serializable {
 
             ALAOccurrenceJsonConverter occurrenceJsonConverter =
                 ALAOccurrenceJsonConverter.builder()
+                    .uuid(uuidr)
                     .metadata(mdr)
                     .basic(br)
                     .temporal(tr)

@@ -304,7 +304,16 @@ public class ALAParentJsonConverter {
   }
 
   private void mapExtendedRecord(EventJsonRecord.Builder builder) {
-    //    builder.setExtensions(JsonConverter.convertExtensions(verbatim));
+    builder.setExtensions(JsonConverter.convertExtensions(verbatim));
+
+    // set occurrence count
+    Integer occurrenceCount =
+            Optional.of(verbatim.getExtensions())
+                    .map(exts -> exts.get(DwcTerm.Occurrence.qualifiedName()))
+                    .map(ext -> ext.size())
+                    .orElse(0);
+
+    builder.setOccurrenceCount(occurrenceCount);
 
     // Set raw as indexed
     extractOptValue(verbatim, DwcTerm.eventID).ifPresent(builder::setEventID);

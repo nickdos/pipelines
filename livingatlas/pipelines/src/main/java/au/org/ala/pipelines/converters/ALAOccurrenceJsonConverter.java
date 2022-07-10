@@ -2,9 +2,7 @@ package au.org.ala.pipelines.converters;
 
 import static org.gbif.pipelines.core.utils.ModelUtils.extractOptValue;
 
-import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.gbif.dwc.terms.DwcTerm;
@@ -18,6 +16,7 @@ import org.gbif.pipelines.io.avro.json.OccurrenceJsonRecord;
 public class ALAOccurrenceJsonConverter {
 
   private final ALAMetadataRecord metadata;
+  private final ALAUUIDRecord uuid;
   private final BasicRecord basic;
   private final TemporalRecord temporal;
   private final LocationRecord location;
@@ -29,7 +28,8 @@ public class ALAOccurrenceJsonConverter {
 
     OccurrenceJsonRecord.Builder builder = OccurrenceJsonRecord.newBuilder();
     // FIX ME
-    builder.setId(UUID.randomUUID().toString());
+    builder.setId(uuid.getUuid());
+    builder.setCreated(uuid.getFirstLoaded().toString());
     builder.setGbifId(1);
     mapMetadataRecord(builder);
     mapBasicRecord(builder);
@@ -76,10 +76,10 @@ public class ALAOccurrenceJsonConverter {
         .setPreparations(basic.getPreparations())
         .setSamplingProtocol(basic.getSamplingProtocol());
 
-//     Agent
-//        builder
-//            .setIdentifiedByIds(JsonConverter.convertAgentList(basic.getIdentifiedByIds()))
-//            .setRecordedByIds(JsonConverter.convertAgentList(basic.getRecordedByIds()));
+    //         Agent
+    builder
+        .setIdentifiedByIds(JsonConverter.convertAgentList(basic.getIdentifiedByIds()))
+        .setRecordedByIds(JsonConverter.convertAgentList(basic.getRecordedByIds()));
 
     // VocabularyConcept
     JsonConverter.convertVocabularyConcept(basic.getLifeStage()).ifPresent(builder::setLifeStage);
@@ -90,13 +90,17 @@ public class ALAOccurrenceJsonConverter {
     JsonConverter.convertVocabularyConcept(basic.getPathway()).ifPresent(builder::setPathway);
 
     // License
-    //    JsonConverter.convertLicense(basic.getLicense()).ifPresent(builder::setLicense);
+    JsonConverter.convertLicense(basic.getLicense()).ifPresent(builder::setLicense);
 
     // Multivalue fields
-    JsonConverter.convertToMultivalue(basic.getRecordedBy()).ifPresent(builder::setRecordedByJoined);
-    JsonConverter.convertToMultivalue(basic.getIdentifiedBy()).ifPresent(builder::setIdentifiedByJoined);
-    JsonConverter.convertToMultivalue(basic.getPreparations()).ifPresent(builder::setPreparationsJoined);
-    JsonConverter.convertToMultivalue(basic.getSamplingProtocol()).ifPresent(builder::setSamplingProtocolJoined);
+    JsonConverter.convertToMultivalue(basic.getRecordedBy())
+        .ifPresent(builder::setRecordedByJoined);
+    JsonConverter.convertToMultivalue(basic.getIdentifiedBy())
+        .ifPresent(builder::setIdentifiedByJoined);
+    JsonConverter.convertToMultivalue(basic.getPreparations())
+        .ifPresent(builder::setPreparationsJoined);
+    JsonConverter.convertToMultivalue(basic.getSamplingProtocol())
+        .ifPresent(builder::setSamplingProtocolJoined);
     JsonConverter.convertToMultivalue(basic.getOtherCatalogNumbers())
         .ifPresent(builder::setOtherCatalogNumbersJoined);
   }
@@ -190,8 +194,18 @@ public class ALAOccurrenceJsonConverter {
 
     //    JsonConverter.convertRankedName(taxon.getAcceptedUsage())
     //            .ifPresent(classificationBuilder::setAcceptedUsage);
+    classificationBuilder.setAcceptedUsage(
+        org.gbif.pipelines.io.avro.json.RankedName.newBuilder()
+            .setKey(-1)
+            .setName(taxon.getScientificName())
+            .setRank(taxon.getTaxonRank())
+            .build());
 
-    //    classificationBuilder.setAcceptedUsage()
+    //
+    // classificationBuilder.setUsageParsedName(org.gbif.pipelines.io.avro.json.ParsedName.newBuilder()
+    //            .setName(taxon.getScientificName())
+    //            .setRank(taxon.getTaxonRank())
+    //            .build());
 
     //    JsonConverter.convertDiagnostic(taxon.getDiagnostics())
     //            .ifPresent(classificationBuilder::setDiagnostics);
@@ -213,8 +227,8 @@ public class ALAOccurrenceJsonConverter {
 
     classificationBuilder.setKingdom(taxon.getKingdom());
     classificationBuilder.setKingdomKey(taxon.getKingdomID());
-    classificationBuilder.setPhylum(taxon.getKingdom());
-    classificationBuilder.setPhylumKey(taxon.getKingdomID());
+    classificationBuilder.setPhylum(taxon.getPhylum());
+    classificationBuilder.setPhylumKey(taxon.getPhylumID());
     classificationBuilder.setClass$(taxon.getClasss());
     classificationBuilder.setClassKey(taxon.getClassID());
     classificationBuilder.setOrder(taxon.getOrder());
@@ -223,6 +237,8 @@ public class ALAOccurrenceJsonConverter {
     classificationBuilder.setFamilyKey(taxon.getFamilyID());
     classificationBuilder.setGenus(taxon.getGenus());
     classificationBuilder.setGenusKey(taxon.getGenusID());
+    classificationBuilder.setSpecies(taxon.getSpecies());
+    classificationBuilder.setSpeciesKey(taxon.getSpeciesID());
 
     // Raw to index classification
     extractOptValue(verbatim, DwcTerm.taxonID).ifPresent(classificationBuilder::setTaxonID);

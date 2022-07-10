@@ -146,13 +146,13 @@ public class JsonConverter {
     return list != null && !list.isEmpty() ? Optional.of(String.join("|", list)) : Optional.empty();
   }
 
-  protected static Optional<String> convertLicense(String license) {
+  public static Optional<String> convertLicense(String license) {
     return Optional.ofNullable(license)
         .filter(l -> !l.equals(License.UNSPECIFIED.name()))
         .filter(l -> !l.equals(License.UNSUPPORTED.name()));
   }
 
-  protected static List<AgentIdentifier> convertAgentList(
+  public static List<AgentIdentifier> convertAgentList(
       List<org.gbif.pipelines.io.avro.AgentIdentifier> list) {
     return list.stream()
         .map(x -> AgentIdentifier.newBuilder().setType(x.getType()).setValue(x.getValue()).build())

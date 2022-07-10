@@ -5,6 +5,8 @@ import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.ALL_AVRO;
 import au.org.ala.pipelines.transforms.ALAMetadataTransform;
 import au.org.ala.pipelines.transforms.ALAOccurrenceJsonTransform;
 import au.org.ala.pipelines.transforms.ALATaxonomyTransform;
+import au.org.ala.pipelines.transforms.ALAUUIDTransform;
+import au.org.ala.utils.ALAFsUtils;
 import au.org.ala.utils.CombinedYamlConfiguration;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -110,12 +112,16 @@ public class ALAOccurrenceToEsIndexPipeline {
         t ->
             PathBuilder.buildPathInterpretUsingTargetPath(options, DwcTerm.Occurrence, t, ALL_AVRO);
 
+    UnaryOperator<String> identifiersPathFn =
+        t -> ALAFsUtils.buildPathIdentifiersUsingTargetPath(options, t, ALL_AVRO);
+
     Pipeline p = pipelinesFn.apply(options);
 
     PCollection<String> jsonCollection =
         IndexingTransform.builder()
             .pipeline(p)
             .pathFn(pathFn)
+            .identifiersPathFn(identifiersPathFn)
             .asParentChildRecord(false)
             .build()
             .apply();
@@ -160,9 +166,12 @@ public class ALAOccurrenceToEsIndexPipeline {
 
     private final Pipeline pipeline;
     private final UnaryOperator<String> pathFn;
+
+    private final UnaryOperator<String> identifiersPathFn;
     private final boolean asParentChildRecord;
 
     // Init transforms
+    private final ALAUUIDTransform uuidTransform = ALAUUIDTransform.create();
     private final BasicTransform basicTransform = BasicTransform.builder().create();
     private final ALAMetadataTransform metadataTransform = ALAMetadataTransform.builder().create();
     private final VerbatimTransform verbatimTransform = VerbatimTransform.create();
@@ -177,6 +186,11 @@ public class ALAOccurrenceToEsIndexPipeline {
           pipeline
               .apply("Read occurrence Metadata", metadataTransform.read(pathFn))
               .apply("Convert to occurrence view", View.asSingleton());
+
+      PCollection<KV<String, ALAUUIDRecord>> uuidCollection =
+          pipeline
+              .apply("Read occurrence Verbatim", uuidTransform.read(identifiersPathFn))
+              .apply("Map occurrence Verbatim to KV", uuidTransform.toKv());
 
       PCollection<KV<String, ExtendedRecord>> verbatimCollection =
           pipeline
@@ -211,6 +225,7 @@ public class ALAOccurrenceToEsIndexPipeline {
       log.info("Adding step: Converting into a occurrence json object");
       SingleOutput<KV<String, CoGbkResult>, String> occurrenceJsonDoFn =
           ALAOccurrenceJsonTransform.builder()
+              .uuidRecordTag(uuidTransform.getTag())
               .extendedRecordTag(verbatimTransform.getTag())
               .basicRecordTag(basicTransform.getTag())
               .temporalRecordTag(temporalTransform.getTag())
@@ -225,6 +240,7 @@ public class ALAOccurrenceToEsIndexPipeline {
       return KeyedPCollectionTuple
           // Core
           .of(basicTransform.getTag(), basicCollection)
+          .and(uuidTransform.getTag(), uuidCollection)
           .and(temporalTransform.getTag(), temporalCollection)
           .and(locationTransform.getTag(), locationCollection)
           .and(taxonomyTransform.getTag(), taxonCollection)

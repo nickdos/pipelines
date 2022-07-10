@@ -1,5 +1,8 @@
 package au.org.ala.pipelines.beam;
 
+import static org.gbif.pipelines.common.PipelinesVariables.Metrics.EVENTS_AVRO_TO_JSON_COUNT;
+
+import java.io.Serializable;
 import lombok.Builder;
 import lombok.NonNull;
 import org.apache.beam.sdk.metrics.Counter;
@@ -15,10 +18,6 @@ import org.gbif.pipelines.core.converters.MultimediaConverter;
 import org.gbif.pipelines.core.converters.specific.GbifParentJsonConverter;
 import org.gbif.pipelines.io.avro.*;
 import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
-
-import java.io.Serializable;
-
-import static org.gbif.pipelines.common.PipelinesVariables.Metrics.EVENTS_AVRO_TO_JSON_COUNT;
 
 /**
  * Beam level transformation for the ES output json. The transformation consumes objects, which

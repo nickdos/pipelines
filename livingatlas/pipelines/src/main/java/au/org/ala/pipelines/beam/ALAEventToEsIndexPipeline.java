@@ -4,7 +4,9 @@ import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.ALL_AVRO;
 
 import au.org.ala.pipelines.transforms.ALATaxonomyTransform;
 import au.org.ala.pipelines.util.ElasticsearchTools;
+import au.org.ala.utils.ALAFsUtils;
 import au.org.ala.utils.CombinedYamlConfiguration;
+import au.org.ala.utils.ValidationUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.Objects;
@@ -26,16 +28,16 @@ import org.apache.beam.sdk.transforms.join.CoGbkResult;
 import org.apache.beam.sdk.transforms.join.CoGroupByKey;
 import org.apache.beam.sdk.transforms.join.KeyedPCollectionTuple;
 import org.apache.beam.sdk.values.*;
+import org.apache.hadoop.fs.FileSystem;
 import org.gbif.dwc.terms.DwcTerm;
-import org.gbif.pipelines.common.PipelinesVariables;
 import org.gbif.pipelines.common.beam.metrics.MetricsHandler;
 import org.gbif.pipelines.common.beam.options.EsIndexingPipelineOptions;
 import org.gbif.pipelines.common.beam.options.PipelinesOptionsFactory;
 import org.gbif.pipelines.common.beam.utils.PathBuilder;
+import org.gbif.pipelines.core.factory.FileSystemFactory;
 import org.gbif.pipelines.core.pojo.HdfsConfigs;
 import org.gbif.pipelines.io.avro.*;
 import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
-import org.gbif.pipelines.transforms.converters.ParentJsonTransform;
 import org.gbif.pipelines.transforms.core.*;
 import org.gbif.pipelines.transforms.extension.AudubonTransform;
 import org.gbif.pipelines.transforms.extension.ImageTransform;
@@ -109,14 +111,20 @@ public class ALAEventToEsIndexPipeline {
         t ->
             PathBuilder.buildPathInterpretUsingTargetPath(options, DwcTerm.Occurrence, t, ALL_AVRO);
 
+    UnaryOperator<String> identifiersPathFn =
+        t -> ALAFsUtils.buildPathIdentifiersUsingTargetPath(options, t, ALL_AVRO);
+
     HdfsConfigs hdfsConfigs =
         HdfsConfigs.create(options.getHdfsSiteConfig(), options.getCoreSiteConfig());
-    String occurrencesMetadataPath =
-        PathBuilder.buildDatasetAttemptPath(
-            options, PipelinesVariables.Pipeline.VERBATIM_TO_OCCURRENCE + ".yml", false);
 
-    //    boolean datasetHasOccurrences = FsUtils.fileExists(hdfsConfigs, occurrencesMetadataPath);
-    boolean datasetHasOccurrences = true;
+    FileSystem fs =
+        FileSystemFactory.getInstance(
+                HdfsConfigs.create(options.getHdfsSiteConfig(), options.getCoreSiteConfig()))
+            .getFs(options.getInputPath());
+
+    boolean datasetHasOccurrences =
+        ValidationUtils.isInterpretationAvailable(
+            fs, options.getInputPath(), options.getDatasetId(), options.getAttempt());
 
     options.setAppName("Event indexing of " + options.getDatasetId());
     Pipeline p = pipelinesFn.apply(options);
@@ -210,7 +218,7 @@ public class ALAEventToEsIndexPipeline {
 
     System.out.println("Adding step 3: Converting into a json object");
     SingleOutput<KV<String, CoGbkResult>, String> eventJsonDoFn =
-            ALAParentJsonTransform.builder()
+        ALAParentJsonTransform.builder()
             .extendedRecordTag(verbatimTransform.getTag())
             .identifierRecordTag(identifierTransform.getTag())
             .eventCoreRecordTag(eventCoreTransform.getTag())
@@ -253,6 +261,7 @@ public class ALAEventToEsIndexPipeline {
         datasetHasOccurrences
             ? ALAOccurrenceToEsIndexPipeline.IndexingTransform.builder()
                 .pipeline(p)
+                .identifiersPathFn(identifiersPathFn)
                 .pathFn(occurrencesPathFn)
                 .asParentChildRecord(true)
                 .build()
