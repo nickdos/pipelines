@@ -2,6 +2,7 @@ package au.org.ala.pipelines.beam;
 
 import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.ALL_AVRO;
 
+import au.org.ala.pipelines.transforms.ALAMetadataTransform;
 import au.org.ala.pipelines.transforms.ALATaxonomyTransform;
 import au.org.ala.pipelines.util.ElasticsearchTools;
 import au.org.ala.utils.ALAFsUtils;
@@ -43,7 +44,6 @@ import org.gbif.pipelines.transforms.extension.AudubonTransform;
 import org.gbif.pipelines.transforms.extension.ImageTransform;
 import org.gbif.pipelines.transforms.extension.MeasurementOrFactTransform;
 import org.gbif.pipelines.transforms.extension.MultimediaTransform;
-import org.gbif.pipelines.transforms.metadata.MetadataTransform;
 import org.gbif.pipelines.transforms.specific.IdentifierTransform;
 import org.slf4j.MDC;
 
@@ -130,7 +130,7 @@ public class ALAEventToEsIndexPipeline {
     Pipeline p = pipelinesFn.apply(options);
 
     log.info("Adding step 2: Creating transformations");
-    MetadataTransform metadataTransform = MetadataTransform.builder().create();
+    ALAMetadataTransform metadataTransform = ALAMetadataTransform.builder().create();
     // Core
     EventCoreTransform eventCoreTransform = EventCoreTransform.builder().create();
     ALATaxonomyTransform alaTaxonomyTransform = ALATaxonomyTransform.builder().create();
@@ -149,7 +149,7 @@ public class ALAEventToEsIndexPipeline {
     ImageTransform imageTransform = ImageTransform.builder().create();
 
     System.out.println("Adding step 3: Creating beam pipeline");
-    PCollectionView<MetadataRecord> metadataView =
+    PCollectionView<ALAMetadataRecord> metadataView =
         p.apply("Read Metadata", metadataTransform.read(pathFn))
             .apply("Convert to view", View.asSingleton());
 
@@ -204,7 +204,6 @@ public class ALAEventToEsIndexPipeline {
             .verbatimTransform(verbatimTransform)
             .temporalTransform(temporalTransform)
             .parentLocationTransform(parentLocationTransform)
-            .taxonomyTransform(alaTaxonomyTransform)
             .locationTransform(locationTransform)
             .eventCoreTransform(eventCoreTransform)
             .verbatimCollection(verbatimCollection)
@@ -257,12 +256,25 @@ public class ALAEventToEsIndexPipeline {
             .apply("Grouping objects", CoGroupByKey.create())
             .apply("Merging to json", eventJsonDoFn);
 
+    String denormPath =
+        String.join(
+            "/",
+            options.getTargetPath(),
+            options.getDatasetId().trim(),
+            options.getAttempt().toString(),
+            "event",
+            "event_hierarchy",
+            "*.avro");
+
+    log.info("Using denorm events path  " + denormPath);
+
     PCollection<String> occurrenceJsonCollection =
         datasetHasOccurrences
             ? ALAOccurrenceToEsIndexPipeline.IndexingTransform.builder()
                 .pipeline(p)
                 .identifiersPathFn(identifiersPathFn)
                 .pathFn(occurrencesPathFn)
+                .denormEventsPath(denormPath)
                 .asParentChildRecord(true)
                 .build()
                 .apply()
@@ -314,22 +326,22 @@ public class ALAEventToEsIndexPipeline {
 
     jsonCollection.apply(writeIO);
 
-    System.out.println("Running the pipeline");
+    log.info("Running the pipeline");
     try {
       PipelineResult result = p.run();
       result.waitUntilFinish();
-      System.out.println("Save metrics into the file and set files owner");
+      log.info("Save metrics into the file and set files owner");
       MetricsHandler.saveCountersToTargetPathFile(options, result.metrics());
     } catch (Exception e) {
-      System.out.println("Exception thrown");
+      log.error("Exception thrown", e);
       e.printStackTrace();
     }
 
-    System.out.println("Pipeline has been finished");
+    log.info("Pipeline has been finished");
   }
 
   /** Load image service records for a dataset. */
-  private static PCollection<KV<String, DenormalisedEvent>> getEventDenormalisation(
+  public static PCollection<KV<String, DenormalisedEvent>> getEventDenormalisation(
       EsIndexingPipelineOptions options, Pipeline p) {
     PCollection<KV<String, DenormalisedEvent>> denorm =
         p.apply(

@@ -24,7 +24,7 @@ public class EventQueryVisitorTest {
     ObjectMapper om = new ObjectMapper();
     om.addMixIn(SearchParameter.class, ALAEventSearchParameter.class);
     Predicate predicate = om.readValue(json, Predicate.class);
-    QueryVisitor v = new ALAEventSparkQueryVisitor();
+    QueryVisitor v = new ALAEventSparkQueryVisitor(new ALAEventTermsMapper());
     String queryString = v.buildQuery(predicate);
     System.out.println(queryString);
   }
@@ -37,7 +37,7 @@ public class EventQueryVisitorTest {
     ObjectMapper om = new ObjectMapper();
     om.addMixIn(SearchParameter.class, ALAEventSearchParameter.class);
     Predicate predicate = om.readValue(json, Predicate.class);
-    QueryVisitor v = new ALAEventSparkQueryVisitor();
+    QueryVisitor v = new ALAEventSparkQueryVisitor(new ALAEventTermsMapper());
     String queryString = v.buildQuery(predicate);
     System.out.println(queryString);
   }

@@ -12,7 +12,6 @@ public enum ALAEventSearchParameter implements SearchParameter {
   EVENT_TYPE(String.class),
   LOCATION_ID(String.class),
   COUNTRY_CODE(String.class),
-  MEASUREMENT_TYPES(String.class),
   YEAR(Integer.class),
   MONTH(Integer.class),
   EVENT_DATE(Date.class),

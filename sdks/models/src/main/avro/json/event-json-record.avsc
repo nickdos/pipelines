@@ -97,30 +97,24 @@
       {"name":"mediaTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"mediaLicenses","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"multimediaItems","type":{"type":"array","items":"Multimedia"},"default":null,"doc":""},
-      // MeasurementOrFact
-      {"name":"measurementOrFactTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
-      {"name":"measurementOrFactMethods","type":{"type":"array","items":"string"},"default":null,"doc":""},
       // Extra
       {"name":"issues","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"notIssues","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"extensions","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"verbatim","type":["null","VerbatimRecord"],"default":null,"doc":""},
-      // Aggregations
+      //Agreegations
       {"name":"occurrenceCount","type":["null","int"],"default":null,"doc":""},
-      {"name":"childEventCount","type":["null","int"],"default":null,"doc":""},
+      // MeasurementOrFact
+      {"name":"measurementOrFactTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
+      {"name":"measurementOrFactMethods","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"measurementOrFactCount","type":["null","int"],"default":null,"doc":""},
-      {"name":"kingdoms","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"phyla","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"classes","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"orders","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"families","type":{"type":"array","items":"string"},"default":[],"doc":""},
-      {"name":"genera","type":{"type":"array","items":"string"},"default":[],"doc":""},
       // Denormalised event info
       {"name":"eventHierarchy","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"eventTypeHierarchy","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"eventHierarchyJoined","type":["null","string"],"default":null,"doc":""},
       {"name":"eventTypeHierarchyJoined","type":["null","string"],"default":null,"doc":""},
-      {"name":"eventHierarchyLevels","type":["null","int"],"default":null,"doc":""}
+      {"name":"eventHierarchyLevels","type":["null","int"],"default":null,"doc":""},
+      {"name":"measurementOrFacts","type":{"type":"array","items":"org.gbif.pipelines.io.avro.json.MeasurementOrFactJsonRecord"},"default":[],"doc":""}
     ]
   }
 ]

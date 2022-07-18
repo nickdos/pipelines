@@ -12,7 +12,7 @@ import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 import org.gbif.api.model.common.search.SearchParameter
 import org.gbif.api.model.predicate.Predicate
 import org.gbif.dwc.terms.DwcTerm
-import org.gbif.predicate.query.{ALAEventSearchParameter, ALAEventSparkQueryVisitor}
+import org.gbif.predicate.query.{ALAEventSearchParameter, ALAEventSparkQueryVisitor, ALAEventTermsMapper}
 
 import java.io.{BufferedInputStream, File, FileInputStream, FileOutputStream}
 import java.net.{URI, URL}
@@ -66,7 +66,7 @@ object DownloadDwCAPipeline {
       val unescaped = predicateQueryJSON.replaceAll("\\\\", "")
       om.addMixIn(classOf[SearchParameter], classOf[ALAEventSearchParameter]);
       val predicate = om.readValue(unescaped, classOf[Predicate]);
-      val v = new ALAEventSparkQueryVisitor();
+      val v = new ALAEventSparkQueryVisitor(new ALAEventTermsMapper());
       v.buildQuery(predicate);
     } else {
       ""

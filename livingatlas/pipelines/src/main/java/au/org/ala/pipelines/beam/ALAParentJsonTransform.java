@@ -2,6 +2,7 @@ package au.org.ala.pipelines.beam;
 
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.EVENTS_AVRO_TO_JSON_COUNT;
 
+import au.org.ala.pipelines.converters.ALAParentJsonConverter;
 import java.io.Serializable;
 import lombok.Builder;
 import lombok.NonNull;
@@ -15,7 +16,6 @@ import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
 import org.gbif.pipelines.core.converters.MultimediaConverter;
-import org.gbif.pipelines.core.converters.specific.GbifParentJsonConverter;
 import org.gbif.pipelines.io.avro.*;
 import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
 
@@ -74,7 +74,7 @@ public class ALAParentJsonTransform implements Serializable {
   @NonNull private final TupleTag<MultimediaRecord> multimediaRecordTag;
   @NonNull private final TupleTag<ImageRecord> imageRecordTag;
   @NonNull private final TupleTag<AudubonRecord> audubonRecordTag;
-  @NonNull private final PCollectionView<MetadataRecord> metadataView;
+  @NonNull private final PCollectionView<ALAMetadataRecord> metadataView;
   @NonNull private final TupleTag<DerivedMetadataRecord> derivedMetadataRecordTag;
   @NonNull private final TupleTag<MeasurementOrFactRecord> measurementOrFactRecordTag;
   private final TupleTag<DenormalisedEvent> denormalisedEventTag;
@@ -93,7 +93,7 @@ public class ALAParentJsonTransform implements Serializable {
             String k = c.element().getKey();
 
             // Core
-            MetadataRecord mdr = c.sideInput(metadataView);
+            ALAMetadataRecord mdr = c.sideInput(metadataView);
             ExtendedRecord er =
                 v.getOnly(extendedRecordTag, ExtendedRecord.newBuilder().setId(k).build());
             EventCoreRecord ecr =
@@ -126,15 +126,14 @@ public class ALAParentJsonTransform implements Serializable {
 
             MultimediaRecord mmr = MultimediaConverter.merge(mr, imr, ar);
 
-            // Derived metadata
-            //            DerivedMetadataRecord dmr =
-            //                v.getOnly(
-            //                    derivedMetadataRecordTag,
-            // DerivedMetadataRecord.newBuilder().setId(k).build());
+            //             Derived metadata
+            DerivedMetadataRecord dmr =
+                v.getOnly(
+                    derivedMetadataRecordTag, DerivedMetadataRecord.newBuilder().setId(k).build());
 
             // Convert and
             String json =
-                GbifParentJsonConverter.builder()
+                ALAParentJsonConverter.builder()
                     .metadata(mdr)
                     .eventCore(ecr)
                     .identifier(ir)
@@ -143,7 +142,7 @@ public class ALAParentJsonTransform implements Serializable {
                     .multimedia(mmr)
                     .verbatim(er)
                     //                    .taxon(txr)
-                    //                    .derivedMetadata(dmr)
+                    .derivedMetadata(dmr)
                     .measurementOrFactRecord(mofr)
                     .denormalisedEvent(de)
                     .build()

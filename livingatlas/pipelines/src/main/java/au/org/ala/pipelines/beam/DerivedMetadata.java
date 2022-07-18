@@ -1,6 +1,5 @@
 package au.org.ala.pipelines.beam;
 
-import au.org.ala.pipelines.transforms.ALATaxonomyTransform;
 import java.util.function.UnaryOperator;
 import lombok.Builder;
 import org.apache.beam.sdk.Pipeline;
@@ -25,7 +24,6 @@ public class DerivedMetadata {
   private final VerbatimTransform verbatimTransform;
   private final TemporalTransform temporalTransform;
   private final LocationTransform parentLocationTransform;
-  private final ALATaxonomyTransform taxonomyTransform;
   private final EventCoreTransform eventCoreTransform;
   private final LocationTransform locationTransform;
   private final PCollection<KV<String, ExtendedRecord>> verbatimCollection;
@@ -81,31 +79,6 @@ public class DerivedMetadata {
         .apply("Calculate the WKT Convex Hull of all records", Combine.perKey(new ConvexHullFn()));
   }
 
-  //    private PCollection<KV<String, Iterable<ALATaxonRecord>>> taxonomicCoverage() {
-  //      PCollection<KV<String, ALATaxonRecord>> eventOccurrencesTaxonCollection =
-  //          pipeline
-  //              .apply(
-  //                  "Read event occurrences taxon records",
-  // taxonomyTransform.read(occurrencesPathFn))
-  //              //                      .apply(
-  //              //                              "Remove taxon records with null parent ids",
-  //              //
-  //              // Filter.by(NotNullOrEmptyFilter.of(ALATaxonRecord::get)))
-  //              .apply("Map event occurrences taxon to KV", taxonomyTransform.toParentKv());
-  //
-  //      PCollection<KV<String, ALATaxonRecord>> taxonRecordsOfSubEvents =
-  //              ParentEventExpandTransform.createTaxonTransform(
-  //                              taxonomyTransform.getTag(), eventCoreTransform.getTag())
-  //                      .toSubEventsRecords("Taxon", taxonCollection, eventCoreCollection);
-  //
-  //      return PCollectionList.of(taxonCollection)
-  //          .and(eventOccurrencesTaxonCollection)
-  //          .and(taxonRecordsOfSubEvents)
-  //          .apply("Join event and occurrence taxon records", Flatten.pCollections())
-  //          .apply("Select a sample of taxon records", Sample.fixedSizePerKey(1000));
-  //      return PCollectionList.empty(pipeline);
-  //    }
-
   private static final TupleTag<Iterable<ALATaxonRecord>> ITERABLE_ALA_TAXON_TAG =
       new TupleTag<Iterable<ALATaxonRecord>>() {};
 
@@ -121,7 +94,6 @@ public class DerivedMetadata {
 
     return KeyedPCollectionTuple.of(ConvexHullFn.tag(), convexHull())
         .and(TemporalCoverageFn.tag(), temporalCoverage())
-        //          .and(ITERABLE_ALA_TAXON_TAG, taxonomicCoverage())
         .and(
             verbatimTransform.getTag(),
             PCollectionList.of(eventOccurrenceVerbatimCollection)

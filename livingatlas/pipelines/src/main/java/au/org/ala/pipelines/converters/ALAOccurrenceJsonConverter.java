@@ -2,13 +2,18 @@ package au.org.ala.pipelines.converters;
 
 import static org.gbif.pipelines.core.utils.ModelUtils.extractOptValue;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.pipelines.core.converters.JsonConverter;
 import org.gbif.pipelines.io.avro.*;
 import org.gbif.pipelines.io.avro.json.GbifClassification;
+import org.gbif.pipelines.io.avro.json.MeasurementOrFactJsonRecord;
 import org.gbif.pipelines.io.avro.json.OccurrenceJsonRecord;
 
 @Slf4j
@@ -24,6 +29,10 @@ public class ALAOccurrenceJsonConverter {
   private final MultimediaRecord multimedia;
   private final ExtendedRecord verbatim;
 
+  private final DenormalisedEvent denormalisedEvent;
+
+  private final MeasurementOrFactRecord measurementOrFact;
+
   public OccurrenceJsonRecord convert() {
 
     OccurrenceJsonRecord.Builder builder = OccurrenceJsonRecord.newBuilder();
@@ -38,6 +47,20 @@ public class ALAOccurrenceJsonConverter {
     mapTaxonRecord(builder);
     mapMultimediaRecord(builder);
     mapExtendedRecord(builder);
+    mapDenormalisedEvent(builder);
+    mapMeasurementOrFactRecord(builder);
+
+    // synthesize a locationID if one isnt provided
+    if (builder.getLocationID() == null
+        && location.getDecimalLatitude() != null
+        && location.getDecimalLongitude() != null) {
+      builder.setLocationID(
+          Math.abs(location.getDecimalLatitude())
+              + (location.getDecimalLatitude() > 0 ? "N" : "S")
+              + ", "
+              + Math.abs(location.getDecimalLongitude())
+              + (location.getDecimalLongitude() > 0 ? "E" : "W"));
+    }
 
     return builder.build();
   }
@@ -115,6 +138,83 @@ public class ALAOccurrenceJsonConverter {
             .setConcept(concepts.getConcept())
             .setLineage(concepts.getLineage())
             .build());
+  }
+
+  private void mapDenormalisedEvent(OccurrenceJsonRecord.Builder builder) {
+
+    if (denormalisedEvent.getParents() != null & !denormalisedEvent.getParents().isEmpty()) {
+
+      List<String> eventTypes = new ArrayList<>();
+      List<String> eventIDs = new ArrayList<>();
+
+      boolean hasCoordsInfo = builder.getDecimalLatitude() != null;
+      boolean hasCountryInfo = builder.getCountryCode() != null;
+      boolean hasStateInfo = builder.getStateProvince() != null;
+      boolean hasYearInfo = builder.getYear() != null;
+      boolean hasMonthInfo = builder.getMonth() != null;
+      boolean hasLocationID = builder.getLocationID() != null;
+
+      // extract location & temporal information from
+      denormalisedEvent
+          .getParents()
+          .forEach(
+              parent -> {
+                if (!hasYearInfo && parent.getYear() != null) {
+                  builder.setYear(parent.getYear());
+                }
+
+                if (!hasMonthInfo && parent.getMonth() != null) {
+                  builder.setMonth(parent.getMonth());
+                }
+
+                if (!hasCountryInfo && parent.getCountryCode() != null) {
+                  builder.setCountryCode(parent.getCountryCode());
+                }
+
+                if (!hasStateInfo && parent.getStateProvince() != null) {
+                  builder.setStateProvince(parent.getStateProvince());
+                }
+
+                if (!hasCoordsInfo
+                    && parent.getDecimalLatitude() != null
+                    && parent.getDecimalLongitude() != null) {
+                  builder
+                      .setHasCoordinate(true)
+                      .setDecimalLatitude(parent.getDecimalLatitude())
+                      .setDecimalLongitude(parent.getDecimalLongitude())
+                      // geo_point
+                      .setCoordinates(
+                          JsonConverter.convertCoordinates(
+                              parent.getDecimalLongitude(), parent.getDecimalLatitude()))
+                      // geo_shape
+                      .setScoordinates(
+                          JsonConverter.convertScoordinates(
+                              parent.getDecimalLongitude(), parent.getDecimalLatitude()));
+                }
+
+                if (!hasLocationID && parent.getLocationID() != null) {
+                  builder.setLocationID(parent.getLocationID());
+                }
+
+                eventIDs.add(parent.getEventID());
+                eventTypes.add(parent.getEventType());
+              });
+
+      builder.setEventHierarchy(eventIDs);
+      builder.setEventTypeHierarchy(eventTypes);
+      builder.setEventHierarchyJoined(String.join(" / ", eventIDs));
+      builder.setEventTypeHierarchyJoined(String.join(" / ", eventTypes));
+      builder.setEventHierarchyLevels(eventIDs.size());
+    } else {
+      List<String> eventHierarchy = new ArrayList<>();
+      if (builder.getParentEventId() != null) {
+        eventHierarchy.add(builder.getParentEventId());
+      }
+      if (builder.getEventId() != null) {
+        eventHierarchy.add(builder.getEventId());
+      }
+      builder.setEventHierarchy(eventHierarchy);
+    }
   }
 
   private void mapTemporalRecord(OccurrenceJsonRecord.Builder builder) {
@@ -196,7 +296,8 @@ public class ALAOccurrenceJsonConverter {
     //            .ifPresent(classificationBuilder::setAcceptedUsage);
     classificationBuilder.setAcceptedUsage(
         org.gbif.pipelines.io.avro.json.RankedName.newBuilder()
-            .setKey(-1)
+            .setKey(taxon.getLft())
+            .setGuid(taxon.getTaxonConceptID())
             .setName(taxon.getScientificName())
             .setRank(taxon.getTaxonRank())
             .build());
@@ -281,5 +382,38 @@ public class ALAOccurrenceJsonConverter {
     extractOptValue(verbatim, DwcTerm.collectionCode).ifPresent(builder::setCollectionCode);
     extractOptValue(verbatim, DwcTerm.catalogNumber).ifPresent(builder::setCatalogNumber);
     extractOptValue(verbatim, DwcTerm.occurrenceID).ifPresent(builder::setOccurrenceId);
+  }
+
+  private void mapMeasurementOrFactRecord(OccurrenceJsonRecord.Builder builder) {
+
+    if (measurementOrFact != null) {
+      builder.setMeasurementOrFactMethods(
+          measurementOrFact.getMeasurementOrFactItems().stream()
+              .map(MeasurementOrFact::getMeasurementMethod)
+              .filter(x -> StringUtils.isNotEmpty(x))
+              .distinct()
+              .collect(Collectors.toList()));
+      builder.setMeasurementOrFactTypes(
+          measurementOrFact.getMeasurementOrFactItems().stream()
+              .map(MeasurementOrFact::getMeasurementType)
+              .filter(x -> StringUtils.isNotEmpty(x))
+              .distinct()
+              .collect(Collectors.toList()));
+
+      List<MeasurementOrFactJsonRecord> mofs =
+          measurementOrFact.getMeasurementOrFactItems().stream()
+              .map(
+                  mor -> {
+                    return MeasurementOrFactJsonRecord.newBuilder()
+                        .setMeasurementID(mor.getMeasurementID())
+                        .setMeasurementMethod(mor.getMeasurementMethod())
+                        .setMeasurementType(mor.getMeasurementType())
+                        .setMeasurementValue(mor.getMeasurementValue())
+                        .setMeasurementUnit(mor.getMeasurementUnit())
+                        .build();
+                  })
+              .collect(Collectors.toList());
+      builder.setMeasurementOrFacts(mofs);
+    }
   }
 }

@@ -59,6 +59,7 @@
       {"name":"locality","type":["null","string"],"default":null,"doc":""},
       {"name":"occurrenceId","type":["null","string"],"default":null,"doc":""},
       {"name":"datasetID","type":{"type":"array","items":"string"},"default":null,"doc":""},
+      {"name":"locationID","type":["null","string"],"default":null,"doc":""},
       {"name":"datasetName","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"otherCatalogNumbers","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"otherCatalogNumbersJoined","type":["null","string"],"default":null,"doc":""},
@@ -110,7 +111,18 @@
       {"name":"mediaTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"mediaLicenses","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"multimediaItems","type":{"type":"array","items":"Multimedia"},"default":null,"doc":""},
-      {"name":"verbatim","type":["null","VerbatimRecord"],"default":null,"doc":""}
+      {"name":"verbatim","type":["null","VerbatimRecord"],"default":null,"doc":""},
+      // Denormalised event info
+      {"name":"eventHierarchy","type":{"type":"array","items":"string"},"default":[],"doc":""},
+      {"name":"eventTypeHierarchy","type":{"type":"array","items":"string"},"default":[],"doc":""},
+      {"name":"eventHierarchyJoined","type":["null","string"],"default":null,"doc":""},
+      {"name":"eventTypeHierarchyJoined","type":["null","string"],"default":null,"doc":""},
+      {"name":"eventHierarchyLevels","type":["null","int"],"default":null,"doc":""},
+      // MeasurementOrFact
+      {"name":"measurementOrFactTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
+      {"name":"measurementOrFactMethods","type":{"type":"array","items":"string"},"default":null,"doc":""},
+      {"name":"measurementOrFactCount","type":["null","int"],"default":null,"doc":""},
+      {"name":"measurementOrFacts","type":{"type":"array","items":"org.gbif.pipelines.io.avro.json.MeasurementOrFactJsonRecord"},"default":[],"doc":""}
     ]
   }
 ]

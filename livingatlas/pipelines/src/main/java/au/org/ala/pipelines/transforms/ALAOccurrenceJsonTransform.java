@@ -86,6 +86,9 @@ public class ALAOccurrenceJsonTransform implements Serializable {
   @NonNull private final TupleTag<ALATaxonRecord> taxonRecordTag;
   @NonNull private final TupleTag<MultimediaRecord> multimediaRecordTag;
   @NonNull private final PCollectionView<ALAMetadataRecord> metadataView;
+  @NonNull private final TupleTag<DenormalisedEvent> denormalisedEventTag;
+
+  @NonNull private final TupleTag<MeasurementOrFactRecord> measurementOrFactRecordTupleTag;
 
   // Determines if the output record is a parent-child record
   @Builder.Default private final boolean asParentChildRecord = false;
@@ -107,6 +110,7 @@ public class ALAOccurrenceJsonTransform implements Serializable {
             ALAMetadataRecord mdr = c.sideInput(metadataView);
             ALAUUIDRecord uuidr =
                 v.getOnly(uuidRecordTag, ALAUUIDRecord.newBuilder().setId(k).build());
+
             ExtendedRecord er =
                 v.getOnly(extendedRecordTag, ExtendedRecord.newBuilder().setId(k).build());
             BasicRecord br = v.getOnly(basicRecordTag, BasicRecord.newBuilder().setId(k).build());
@@ -116,10 +120,12 @@ public class ALAOccurrenceJsonTransform implements Serializable {
                 v.getOnly(locationRecordTag, LocationRecord.newBuilder().setId(k).build());
             ALATaxonRecord txr =
                 v.getOnly(taxonRecordTag, ALATaxonRecord.newBuilder().setId(k).build());
-
-            // Extension
-            MultimediaRecord mr =
-                v.getOnly(multimediaRecordTag, MultimediaRecord.newBuilder().setId(k).build());
+            DenormalisedEvent de =
+                v.getOnly(denormalisedEventTag, DenormalisedEvent.newBuilder().setId(k).build());
+            MeasurementOrFactRecord mfr =
+                v.getOnly(
+                    measurementOrFactRecordTupleTag,
+                    MeasurementOrFactRecord.newBuilder().setId(k).build());
 
             ALAOccurrenceJsonConverter occurrenceJsonConverter =
                 ALAOccurrenceJsonConverter.builder()
@@ -129,7 +135,9 @@ public class ALAOccurrenceJsonTransform implements Serializable {
                     .temporal(tr)
                     .location(lr)
                     .taxon(txr)
+                    .denormalisedEvent(de)
                     .verbatim(er)
+                    .measurementOrFact(mfr)
                     .build();
             if (asParentChildRecord) {
               c.output(

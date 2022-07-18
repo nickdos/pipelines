@@ -7,8 +7,8 @@ import java.util.stream.Collectors;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.gbif.api.vocabulary.License;
 import org.gbif.dwc.terms.DwcTerm;
+import org.gbif.dwc.terms.GbifTerm;
 import org.gbif.pipelines.core.converters.JsonConverter;
 import org.gbif.pipelines.core.utils.HashConverter;
 import org.gbif.pipelines.io.avro.*;
@@ -76,6 +76,8 @@ public class ALAParentJsonConverter {
     ParentJsonRecord.Builder builder =
         ParentJsonRecord.newBuilder()
             .setId(verbatim.getId())
+            .setInternalId(identifier.getInternalId())
+            .setUniqueKey(identifier.getUniqueKey())
             .setMetadataBuilder(mapMetadataJsonRecord());
 
     mapCreated(builder);
@@ -102,6 +104,30 @@ public class ALAParentJsonConverter {
     mapMeasurementOrFactRecord(builder);
     mapDenormalisedEvent(builder);
 
+    // synthesize a locationID if one isnt provided
+    if (builder.getLocationID() == null
+        && location.getDecimalLatitude() != null
+        && location.getDecimalLongitude() != null) {
+      builder.setLocationID(
+          Math.abs(location.getDecimalLatitude())
+              + (location.getDecimalLatitude() > 0 ? "N" : "S")
+              + ", "
+              + Math.abs(location.getDecimalLongitude())
+              + (location.getDecimalLongitude() > 0 ? "E" : "W"));
+    }
+
+    // set the event type
+    if (builder.getEventType() == null) {
+      Optional<String> eventType = extractOptValue(verbatim, GbifTerm.eventType);
+      if (eventType.isPresent()) {
+        VocabularyConcept eventTypeVoc =
+            VocabularyConcept.newBuilder()
+                .setLineage(Arrays.asList("Event", eventType.get()))
+                .setConcept(eventType.get())
+                .build();
+        builder.setEventType(eventTypeVoc);
+      }
+    }
     return builder;
   }
 
@@ -176,6 +202,15 @@ public class ALAParentJsonConverter {
       builder.setEventHierarchyJoined(String.join(" / ", eventIDs));
       builder.setEventTypeHierarchyJoined(String.join(" / ", eventTypes));
       builder.setEventHierarchyLevels(eventIDs.size());
+    } else {
+      List<String> eventHierarchy = new ArrayList<>();
+      if (builder.getParentEventID() != null) {
+        eventHierarchy.add(builder.getParentEventID());
+      }
+      if (builder.getEventID() != null) {
+        eventHierarchy.add(builder.getEventID());
+      }
+      builder.setEventHierarchy(eventHierarchy);
     }
   }
 
@@ -194,36 +229,15 @@ public class ALAParentJsonConverter {
         .setLocationID(eventCore.getLocationID());
 
     // Vocabulary
-    convertVocabularyConcept(eventCore.getEventType()).ifPresent(builder::setEventType);
+    JsonConverter.convertVocabularyConcept(eventCore.getEventType())
+        .ifPresent(builder::setEventType);
 
     // License
-    convertLicense(eventCore.getLicense()).ifPresent(builder::setLicense);
+    JsonConverter.convertLicense(eventCore.getLicense()).ifPresent(builder::setLicense);
 
     // Multivalue fields
-    convertToMultivalue(eventCore.getSamplingProtocol())
+    JsonConverter.convertToMultivalue(eventCore.getSamplingProtocol())
         .ifPresent(builder::setSamplingProtocolJoined);
-  }
-
-  protected static Optional<String> convertToMultivalue(List<String> list) {
-    return list != null && !list.isEmpty() ? Optional.of(String.join("|", list)) : Optional.empty();
-  }
-
-  protected static Optional<String> convertLicense(String license) {
-    return Optional.ofNullable(license)
-        .filter(l -> !l.equals(License.UNSPECIFIED.name()))
-        .filter(l -> !l.equals(License.UNSUPPORTED.name()));
-  }
-
-  protected static Optional<VocabularyConcept> convertVocabularyConcept(
-      org.gbif.pipelines.io.avro.VocabularyConcept concepts) {
-    if (concepts == null) {
-      return Optional.empty();
-    }
-    return Optional.of(
-        VocabularyConcept.newBuilder()
-            .setConcept(concepts.getConcept())
-            .setLineage(concepts.getLineage())
-            .build());
   }
 
   private void mapTemporalRecord(EventJsonRecord.Builder builder) {
@@ -301,6 +315,21 @@ public class ALAParentJsonConverter {
             .filter(x -> StringUtils.isNotEmpty(x))
             .distinct()
             .collect(Collectors.toList()));
+
+    List<MeasurementOrFactJsonRecord> mofs =
+        measurementOrFactRecord.getMeasurementOrFactItems().stream()
+            .map(
+                mor -> {
+                  return MeasurementOrFactJsonRecord.newBuilder()
+                      .setMeasurementID(mor.getMeasurementID())
+                      .setMeasurementMethod(mor.getMeasurementMethod())
+                      .setMeasurementType(mor.getMeasurementType())
+                      .setMeasurementValue(mor.getMeasurementValue())
+                      .setMeasurementUnit(mor.getMeasurementUnit())
+                      .build();
+                })
+            .collect(Collectors.toList());
+    builder.setMeasurementOrFacts(mofs);
   }
 
   private void mapExtendedRecord(EventJsonRecord.Builder builder) {
@@ -308,10 +337,10 @@ public class ALAParentJsonConverter {
 
     // set occurrence count
     Integer occurrenceCount =
-            Optional.of(verbatim.getExtensions())
-                    .map(exts -> exts.get(DwcTerm.Occurrence.qualifiedName()))
-                    .map(ext -> ext.size())
-                    .orElse(0);
+        Optional.of(verbatim.getExtensions())
+            .map(exts -> exts.get(DwcTerm.Occurrence.qualifiedName()))
+            .map(ext -> ext.size())
+            .orElse(0);
 
     builder.setOccurrenceCount(occurrenceCount);
 
