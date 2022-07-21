@@ -93,5 +93,4 @@ outlier:
 elastic:
   inputPath: hdfs://localhost:9000/pipelines-data
   targetPath: hdfs://localhost:9000/pipelines-data
-  esSchemaPath: /Users/mar759/dev/pipelines/examples/pipelines/src/main/resources/elasticsearch/es-parent-schema.json
-
+  esSchemaPath: /Users/mar759/dev/pipelines-airflow/extended-data/es-event-core-schema.json

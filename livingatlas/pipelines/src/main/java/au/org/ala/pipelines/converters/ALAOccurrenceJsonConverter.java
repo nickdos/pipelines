@@ -15,6 +15,7 @@ import org.gbif.pipelines.io.avro.*;
 import org.gbif.pipelines.io.avro.json.GbifClassification;
 import org.gbif.pipelines.io.avro.json.MeasurementOrFactJsonRecord;
 import org.gbif.pipelines.io.avro.json.OccurrenceJsonRecord;
+import org.gbif.pipelines.io.avro.json.Taxonomy;
 
 @Slf4j
 @Builder
@@ -277,7 +278,43 @@ public class ALAOccurrenceJsonConverter {
 
   private void mapTaxonRecord(OccurrenceJsonRecord.Builder builder) {
     // Set  GbifClassification
-    builder.setGbifClassification(convertClassification(verbatim, taxon));
+    GbifClassification gc = convertClassification(verbatim, taxon);
+
+    List<Taxonomy> taxonomy = new ArrayList<>();
+
+    taxonomy.add(
+        Taxonomy.newBuilder().setName(gc.getKingdom()).setTaxonKey(gc.getKingdomKey()).build());
+    taxonomy.add(
+        Taxonomy.newBuilder().setName(gc.getPhylum()).setTaxonKey(gc.getPhylumKey()).build());
+    taxonomy.add(
+        Taxonomy.newBuilder().setName(gc.getClass$()).setTaxonKey(gc.getClassKey()).build());
+    taxonomy.add(
+        Taxonomy.newBuilder().setName(gc.getOrder()).setTaxonKey(gc.getOrderKey()).build());
+    taxonomy.add(
+        Taxonomy.newBuilder().setName(gc.getFamily()).setTaxonKey(gc.getFamilyKey()).build());
+    taxonomy.add(
+        Taxonomy.newBuilder().setName(gc.getGenus()).setTaxonKey(gc.getGenusKey()).build());
+    taxonomy.add(
+        Taxonomy.newBuilder().setName(gc.getSpecies()).setTaxonKey(gc.getSpeciesKey()).build());
+    if (gc.getAcceptedUsage() != null
+        && (gc.getAcceptedUsage().getGuid() != null || gc.getAcceptedUsage().getKey() != null)) {
+      taxonomy.add(
+          Taxonomy.newBuilder()
+              .setName(gc.getAcceptedUsage().getName())
+              .setTaxonKey(
+                  gc.getAcceptedUsage().getGuid() != null
+                      ? gc.getAcceptedUsage().getGuid()
+                      : gc.getAcceptedUsage().getKey().toString())
+              .build());
+    }
+
+    taxonomy =
+        taxonomy.stream().filter(tr -> tr.getTaxonKey() != null).collect(Collectors.toList());
+
+    // set taxonomy
+    builder.setTaxonomy(taxonomy);
+    gc.setTaxonKey(taxonomy.stream().map(t -> t.getTaxonKey()).collect(Collectors.toList()));
+    builder.setGbifClassification(gc);
   }
 
   public static GbifClassification convertClassification(

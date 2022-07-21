@@ -116,7 +116,7 @@ public class ALAParentJsonConverter {
               + (location.getDecimalLongitude() > 0 ? "E" : "W"));
     }
 
-    // set the event type
+    // set the event type to the raw value, if the vocab not matched
     if (builder.getEventType() == null) {
       Optional<String> eventType = extractOptValue(verbatim, GbifTerm.eventType);
       if (eventType.isPresent()) {
@@ -128,7 +128,26 @@ public class ALAParentJsonConverter {
         builder.setEventType(eventTypeVoc);
       }
     }
+
+    // retrieve sampling protocol from occurrences, if nothing supplied in events
+    if (builder.getSamplingProtocol() == null && builder.getSamplingProtocol().isEmpty()) {
+      Optional<List<String>> samplingProtocols =
+          Optional.of(verbatim.getExtensions())
+              .map(exts -> exts.get(DwcTerm.Occurrence.qualifiedName()))
+              .map(ext -> extractValuesFromExtension(ext, DwcTerm.samplingProtocol));
+      builder.setSamplingProtocol(samplingProtocols.orElse(new ArrayList<>()));
+    }
+
     return builder;
+  }
+
+  public static List<String> extractValuesFromExtension(
+      List<Map<String, String>> extension, DwcTerm term) {
+    return extension.stream()
+        .map(x -> x.getOrDefault(term.qualifiedName(), null))
+        .filter(x -> x != null)
+        .distinct()
+        .collect(Collectors.toList());
   }
 
   private MetadataJsonRecord.Builder mapMetadataJsonRecord() {

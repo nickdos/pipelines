@@ -124,12 +124,11 @@ collectory:
     Authorization: add-a-api-key-here
 
 alaNameMatch:
-  wsUrl: http://localhost:9179
+  wsUrl: https://namematching-ws-test.ala.org.au
   timeoutSec: 70
   retryConfig:
     maxAttempts: 5
     initialIntervalMillis: 5000
-
 
 ### la-pipelines cli additional arguments, like JVM or spark command line arguments
 interpret-sh-args:

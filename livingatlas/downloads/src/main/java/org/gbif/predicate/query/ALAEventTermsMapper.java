@@ -15,10 +15,17 @@ public class ALAEventTermsMapper implements SQLTermsMapper<ALAEventSearchParamet
           .put(ALAEventSearchParameter.COUNTRY_CODE, DwcTerm.countryCode)
           .put(ALAEventSearchParameter.SAMPLING_PROTOCOL, DwcTerm.samplingProtocol)
           .put(ALAEventSearchParameter.EVENT_TYPE, GbifTerm.eventType)
+          .put(ALAEventSearchParameter.year, DwcTerm.year)
+          .put(ALAEventSearchParameter.month, DwcTerm.month)
+          .put(ALAEventSearchParameter.stateProvince, DwcTerm.stateProvince)
+          .put(ALAEventSearchParameter.countryCode, DwcTerm.countryCode)
+          .put(ALAEventSearchParameter.samplingProtocol, DwcTerm.samplingProtocol)
+          .put(ALAEventSearchParameter.eventType, GbifTerm.eventType)
           .build();
   private static final Map<SearchParameter, Term> ARRAY_STRING_TERMS =
       ImmutableMap.<SearchParameter, Term>builder()
           .put(ALAEventSearchParameter.SAMPLING_PROTOCOL, DwcTerm.samplingProtocol)
+          .put(ALAEventSearchParameter.samplingProtocol, DwcTerm.samplingProtocol)
           .build();
 
   private static final Map<SearchParameter, Term> DENORMED_TERMS =
@@ -27,6 +34,10 @@ public class ALAEventTermsMapper implements SQLTermsMapper<ALAEventSearchParamet
           .put(ALAEventSearchParameter.COUNTRY_CODE, DwcTerm.countryCode)
           .put(ALAEventSearchParameter.YEAR, DwcTerm.year)
           .put(ALAEventSearchParameter.MONTH, DwcTerm.month)
+          .put(ALAEventSearchParameter.stateProvince, DwcTerm.stateProvince)
+          .put(ALAEventSearchParameter.countryCode, DwcTerm.countryCode)
+          .put(ALAEventSearchParameter.year, DwcTerm.year)
+          .put(ALAEventSearchParameter.month, DwcTerm.month)
           .build();
 
   @Override

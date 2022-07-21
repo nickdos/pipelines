@@ -1,7 +1,6 @@
 package org.gbif.predicate.query;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import java.util.Date;
 import org.gbif.api.model.common.search.SearchParameter;
 
 @JsonDeserialize(as = ALAEventSearchParameter.class)
@@ -14,9 +13,20 @@ public enum ALAEventSearchParameter implements SearchParameter {
   COUNTRY_CODE(String.class),
   YEAR(Integer.class),
   MONTH(Integer.class),
-  EVENT_DATE(Date.class),
   SAMPLING_PROTOCOL(String.class),
-  STATE_PROVINCE(String.class);
+  STATE_PROVINCE(String.class),
+
+  // probably a nicer way to do this, but for now add the darwin core ID version
+  datasetKey(String.class),
+  parentEventID(String.class),
+  eventID(String.class),
+  eventType(String.class),
+  locationID(String.class),
+  countryCode(String.class),
+  year(Integer.class),
+  month(Integer.class),
+  samplingProtocol(String.class),
+  stateProvince(String.class);
 
   private final Class<?> type;
 
