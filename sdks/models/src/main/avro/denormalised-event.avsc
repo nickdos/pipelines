@@ -12,7 +12,8 @@
       {"name": "stateProvince", "type": ["null", "string"], "default" : null},
       {"name": "countryCode", "type": ["null", "string"], "default" : null},
       {"name": "year", "type": ["null", "int"], "default" : null},
-      {"name": "month", "type": ["null", "int"], "default" : null}
+      {"name": "month", "type": ["null", "int"], "default" : null},
+      {"name": "samplingProtocol", "type": {"type" : "array", "items" : "string"}, "default" : [], "doc": "http://rs.tdwg.org/dwc/terms/samplingProtocol"}
     ]
   },
   {

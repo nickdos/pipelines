@@ -10,10 +10,10 @@ import au.org.ala.utils.CombinedYamlConfiguration;
 import au.org.ala.utils.ValidationUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -196,7 +196,11 @@ public class ALAEventToEsIndexPipeline {
     PCollection<KV<String, DenormalisedEvent>> denormCollection =
         getEventDenormalisation(options, p);
 
+    PCollection<KV<String, String[]>> denormedSamplingProtocols =
+        denormaliseSamplingProtocols(denormCollection, p);
+
     TupleTag<DenormalisedEvent> denormalisedEventTag = new TupleTag<>();
+    TupleTag<String[]> samplingProtocolsTag = new TupleTag<>();
 
     PCollection<KV<String, DerivedMetadataRecord>> derivedMetadataRecordCollection =
         DerivedMetadata.builder()
@@ -229,6 +233,7 @@ public class ALAEventToEsIndexPipeline {
             .measurementOrFactRecordTag(measurementOrFactTransform.getTag())
             .denormalisedEventTag(denormalisedEventTag)
             .derivedMetadataRecordTag(DerivedMetadataTransform.tag())
+            .samplingProtocolsTag(samplingProtocolsTag)
             .metadataView(metadataView)
             .build()
             .converter();
@@ -252,6 +257,7 @@ public class ALAEventToEsIndexPipeline {
             .and(denormalisedEventTag, denormCollection)
             // derived metadata
             .and(DerivedMetadataTransform.tag(), derivedMetadataRecordCollection)
+            .and(samplingProtocolsTag, denormedSamplingProtocols)
             // Apply
             .apply("Grouping objects", CoGroupByKey.create())
             .apply("Merging to json", eventJsonDoFn);
@@ -338,6 +344,58 @@ public class ALAEventToEsIndexPipeline {
     }
 
     log.info("Pipeline has been finished");
+  }
+
+  private static PCollection<KV<String, String[]>> denormaliseSamplingProtocols(
+      PCollection<KV<String, DenormalisedEvent>> denormCollection, Pipeline p) {
+    return denormCollection
+        .apply(
+            ParDo.of(
+                new DoFn<KV<String, DenormalisedEvent>, KV<String, String[]>>() {
+                  @ProcessElement
+                  public void processElement(
+                      @Element KV<String, DenormalisedEvent> source,
+                      OutputReceiver<KV<String, String[]>> out,
+                      ProcessContext c) {
+
+                    List<DenormalisedParentEvent> lineage = source.getValue().getParents();
+
+                    // get the distinct list of sampling protocols
+                    String[] samplingProtocols =
+                        lineage.stream()
+                            .map(e -> e.getSamplingProtocol())
+                            .flatMap(List::stream)
+                            .distinct()
+                            .collect(Collectors.toList())
+                            .toArray(new String[0]);
+
+                    List<String> eventIDs =
+                        lineage.stream()
+                            .map(e -> e.getEventID())
+                            .distinct()
+                            .collect(Collectors.toList());
+
+                    eventIDs.forEach(eventID -> out.output(KV.of(eventID, samplingProtocols)));
+                  }
+                })
+
+            // group by eventID, distinct
+            )
+        .apply(GroupByKey.create())
+        .apply(
+            ParDo.of(
+                new DoFn<KV<String, Iterable<String[]>>, KV<String, String[]>>() {
+                  @ProcessElement
+                  public void processElement(
+                      @Element KV<String, Iterable<String[]>> in,
+                      OutputReceiver<KV<String, String[]>> out,
+                      ProcessContext c) {
+                    Iterable<String[]> lineage = in.getValue();
+                    Set<String> protocols = new HashSet<String>();
+                    lineage.forEach(strArray -> protocols.addAll(Arrays.asList(strArray)));
+                    out.output(KV.of(in.getKey(), protocols.toArray(new String[0])));
+                  }
+                }));
   }
 
   /** Load image service records for a dataset. */

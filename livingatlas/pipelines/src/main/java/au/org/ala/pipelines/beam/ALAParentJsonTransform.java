@@ -78,6 +78,7 @@ public class ALAParentJsonTransform implements Serializable {
   @NonNull private final TupleTag<DerivedMetadataRecord> derivedMetadataRecordTag;
   @NonNull private final TupleTag<MeasurementOrFactRecord> measurementOrFactRecordTag;
   private final TupleTag<DenormalisedEvent> denormalisedEventTag;
+  private final TupleTag<String[]> samplingProtocolsTag;
 
   public SingleOutput<KV<String, CoGbkResult>, String> converter() {
 
@@ -131,6 +132,8 @@ public class ALAParentJsonTransform implements Serializable {
                 v.getOnly(
                     derivedMetadataRecordTag, DerivedMetadataRecord.newBuilder().setId(k).build());
 
+            String[] sps = v.getOnly(samplingProtocolsTag, new String[0]);
+
             // Convert and
             String json =
                 ALAParentJsonConverter.builder()
@@ -145,6 +148,7 @@ public class ALAParentJsonTransform implements Serializable {
                     .derivedMetadata(dmr)
                     .measurementOrFactRecord(mofr)
                     .denormalisedEvent(de)
+                    .samplingProtocols(sps)
                     .build()
                     .toJson();
 

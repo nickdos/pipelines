@@ -1,4 +1,5 @@
 package org.gbif.pipelines.events
+import au.com.bytecode.opencsv.CSVParser
 import org.apache.log4j.{Level, Logger}
 import org.apache.logging.log4j.util.Strings
 import org.apache.spark.graphx._
@@ -6,10 +7,11 @@ import org.apache.spark.graphx.Edge
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.avro.SchemaConverters
 import org.apache.spark.sql.functions.{coalesce, col, lit}
-import org.apache.spark.sql.types.{StructType}
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
-import org.gbif.pipelines.io.avro.{DenormalisedEvent}
+import org.gbif.pipelines.io.avro.DenormalisedEvent
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
+import org.codehaus.jackson.map.ObjectMapper
 
 /**
  * Pipeline that uses spark's graphx API to construct the parent hierarchy
@@ -30,7 +32,8 @@ object DenormalisationPipeline {
     "state_province",
     "country_code",
     "year",
-    "month"
+    "month",
+    "sampling_protocol"
   )
 
   val FIELD_DELIM = "$$$"
@@ -46,6 +49,8 @@ object DenormalisationPipeline {
       println("e.g. dr18391 hdfs://localhost:9000/pipelines-data 1")
       return;
     }
+
+//    val args = "dr18391 hdfs://localhost:9000/pipelines-data 1 true".split(" ")
 
     val datasetId = args(0)
     val hdfsPath =  args(1)
@@ -93,7 +98,8 @@ object DenormalisationPipeline {
     System.out.println("Join")
     val joined_df = eventCoreDF.
       join(locationDF, col("event.id") === col("location.id"), "inner").
-      join(temporalDF, col("event.id") === col("temporal.id"), "inner")
+      join(temporalDF, col("event.id") === col("temporal.id"), "inner").
+      withColumn("samplingProtocolJoined", col("event.samplingProtocol").cast("string"))
 
     System.out.println("select from join")
     val eventsDF = joined_df.filter("event.id is NOT null").select(
@@ -106,7 +112,8 @@ object DenormalisationPipeline {
       coalesce(col("year"), lit("0")).as("year"),
       coalesce(col("month"), lit("0")).as("month"),
       coalesce(col("stateProvince"), lit("0")).as("state_province"),
-      coalesce(col("countryCode"), lit("0")).as("country_code")
+      coalesce(col("countryCode"), lit("0")).as("country_code"),
+      coalesce(col("samplingProtocolJoined"), lit("0")).as("sampling_protocol")
     )
 
     // primary key, root, path - dataframe to graphx for vertices
@@ -147,6 +154,15 @@ object DenormalisationPipeline {
       .save(s"${hdfsPath}/${datasetId}/${attempt}/event/event_hierarchy/")
   }
 
+  def toCastStrArray(elem:String): Array[String] = {
+    if (elem == null || elem.length < 2)
+      return Array()
+    elem
+      .replace("\\]","")
+      .replace("\\[","")
+      .replace("\"","").split(",").toArray
+  }
+
   def genericRecordToRow(row:Row, sqlType:StructType): Row = {
       val eventID = row.getString(0)
       val path = row.getString(1)
@@ -154,7 +170,7 @@ object DenormalisationPipeline {
       val parents:Array[Row] = pathElements.map(pathElement => {
         val elem = pathElement.split(FIELD_DELIM_ESCAPED)
         // this needs to match the order of the AVRO schema
-        if (elem !=null && elem.length ==9){
+        if (elem != null && elem.length == 10){
           Row(
             elem(0), // eventID
             elem(1), // eventType
@@ -164,7 +180,8 @@ object DenormalisationPipeline {
             if (elem(5) != null && elem(5) != "0") elem(5) else null, // stateProvince
             if (elem(6) != null && elem(6) != "0") elem(6) else null, // countryCode
             if (elem(7) != null && elem(7) != "0") elem(7).toInt else null,   // year
-            if (elem(8) != null && elem(8) != "0") elem(8).toInt else null    // month
+            if (elem(8) != null && elem(8) != "0") elem(8).toInt else null,    // month
+            if (elem(9) != null && elem(9) != "0") toCastStrArray(elem(9)) else null    // samplingProtocol
           )
         } else {
           null

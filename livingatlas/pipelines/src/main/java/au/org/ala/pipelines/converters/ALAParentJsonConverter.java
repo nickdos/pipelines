@@ -13,7 +13,6 @@ import org.gbif.pipelines.core.converters.JsonConverter;
 import org.gbif.pipelines.core.utils.HashConverter;
 import org.gbif.pipelines.io.avro.*;
 import org.gbif.pipelines.io.avro.json.*;
-import org.gbif.pipelines.io.avro.json.Parent;
 import org.gbif.pipelines.io.avro.json.VocabularyConcept;
 
 @Slf4j
@@ -31,6 +30,8 @@ public class ALAParentJsonConverter {
   protected OccurrenceJsonRecord occurrenceJsonRecord;
   protected MeasurementOrFactRecord measurementOrFactRecord;
   private DenormalisedEvent denormalisedEvent;
+
+  private String[] samplingProtocols;
 
   public ParentJsonRecord convertToParent() {
     return (occurrenceJsonRecord != null) ? convertToParentOccurrence() : convertToParentEvent();
@@ -93,7 +94,6 @@ public class ALAParentJsonConverter {
     EventJsonRecord.Builder builder = EventJsonRecord.newBuilder();
 
     builder.setId(verbatim.getId());
-    mapIssues(builder);
 
     mapEventCoreRecord(builder);
     mapTemporalRecord(builder);
@@ -126,6 +126,19 @@ public class ALAParentJsonConverter {
                 .setConcept(eventType.get())
                 .build();
         builder.setEventType(eventTypeVoc);
+        builder.setEventHierarchyJoined(eventTypeVoc.getConcept());
+      }
+    }
+
+    // populate with the type for this event at least
+    if (builder.getEventTypeHierarchy() == null || builder.getEventTypeHierarchy().isEmpty()) {
+      List<String> eventTypeHierarchy = new ArrayList<>();
+      if (builder.getEventType() != null) {
+        eventTypeHierarchy.add(builder.getEventType().getConcept());
+      }
+      builder.setEventTypeHierarchy(eventTypeHierarchy);
+      if (builder.getEventType() != null) {
+        builder.setEventTypeHierarchyJoined(builder.getEventType().getConcept());
       }
     }
 
@@ -162,6 +175,7 @@ public class ALAParentJsonConverter {
 
       List<String> eventTypes = new ArrayList<>();
       List<String> eventIDs = new ArrayList<>();
+      List<String> samplingProtocols = new ArrayList<>();
 
       boolean hasCoordsInfo = builder.getDecimalLatitude() != null;
       boolean hasCountryInfo = builder.getCountryCode() != null;
@@ -169,6 +183,8 @@ public class ALAParentJsonConverter {
       boolean hasYearInfo = builder.getYear() != null;
       boolean hasMonthInfo = builder.getMonth() != null;
       boolean hasLocationID = builder.getLocationID() != null;
+      boolean hasSamplingProtocol =
+          builder.getSamplingProtocol() != null && !builder.getSamplingProtocol().isEmpty();
 
       // extract location & temporal information from
       denormalisedEvent
@@ -212,9 +228,23 @@ public class ALAParentJsonConverter {
                   builder.setLocationID(parent.getLocationID());
                 }
 
+                if (!hasSamplingProtocol
+                    && parent.getSamplingProtocol() != null
+                    && !parent.getSamplingProtocol().isEmpty()) {
+                  samplingProtocols.addAll(parent.getSamplingProtocol());
+                }
+
                 eventIDs.add(parent.getEventID());
                 eventTypes.add(parent.getEventType());
               });
+
+      if (!hasSamplingProtocol) {
+        builder.setSamplingProtocol(
+            samplingProtocols.stream()
+                .filter(s -> StringUtils.isNotEmpty(s))
+                .distinct()
+                .collect(Collectors.toList()));
+      }
 
       builder.setEventHierarchy(eventIDs);
       builder.setEventTypeHierarchy(eventTypes);
@@ -370,13 +400,11 @@ public class ALAParentJsonConverter {
     extractOptValue(verbatim, DwcTerm.verbatimDepth).ifPresent(builder::setVerbatimDepth);
     extractOptValue(verbatim, DwcTerm.verbatimElevation).ifPresent(builder::setVerbatimElevation);
     extractOptValue(verbatim, DwcTerm.locationID).ifPresent(builder::setLocationID);
-  }
 
-  private void mapIssues(EventJsonRecord.Builder builder) {
-    //    JsonConverter.mapIssues(
-    //        Arrays.asList(metadata, eventCore, temporal, location, multimedia),
-    //        builder::setIssues,
-    //        builder::setNotIssues);
+    String eventName = verbatim.getCoreTerms().get("http://rs.gbif.org/terms/1.0/eventName");
+    if (eventName != null) {
+      builder.setEventName(eventName);
+    }
   }
 
   private void mapCreated(ParentJsonRecord.Builder builder) {
@@ -388,13 +416,14 @@ public class ALAParentJsonConverter {
     builder.setDerivedMetadata(derivedMetadata);
   }
 
-  protected static List<Parent> convertParents(List<org.gbif.pipelines.io.avro.Parent> parents) {
-    if (parents == null) {
-      return Collections.emptyList();
-    }
-
-    return parents.stream()
-        .map(p -> Parent.newBuilder().setId(p.getId()).setEventType(p.getEventType()).build())
-        .collect(Collectors.toList());
-  }
+  //  protected static List<Parent> convertParents(List<org.gbif.pipelines.io.avro.Parent> parents)
+  // {
+  //    if (parents == null) {
+  //      return Collections.emptyList();
+  //    }
+  //
+  //    return parents.stream()
+  //        .map(p -> Parent.newBuilder().setId(p.getId()).setEventType(p.getEventType()).build())
+  //        .collect(Collectors.toList());
+  //  }
 }
