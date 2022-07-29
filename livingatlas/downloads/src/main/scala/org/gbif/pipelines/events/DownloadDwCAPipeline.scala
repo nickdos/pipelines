@@ -118,14 +118,11 @@ object DownloadDwCAPipeline {
     val temporalDF = spark.read.format("avro").
       load(s"${hdfsPath}/${datasetId}/${attempt}/event/temporal/*.avro").as("Temporal")
 
-
     System.out.println("Join")
     val filterDownloadDF = filterSearchDF.select(col("Search.id")).
       join(eventCoreDF, col("Search.id") === col("Core.id"), "inner").
       join(locationDF, col("Search.id") === col("Location.id"), "inner").
       join(temporalDF, col("Search.id") === col("Temporal.id"), "inner")
-
-
 
     // generate interpreted event export
     System.out.println("Export interpreted event data")
@@ -318,9 +315,9 @@ object DownloadDwCAPipeline {
 
     var occDFCoalesce = df.select(fields: _*).coalesce(1)
 
-    stringArrayFields.foreach(arrayField => {
+    stringArrayFields.foreach { arrayField =>
       occDFCoalesce = occDFCoalesce.withColumn(arrayField.name, col(arrayField.name).cast("string"))
-    })
+    }
 
     (occDFCoalesce, Array("id") ++ exportFields)
   }

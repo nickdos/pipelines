@@ -6,7 +6,8 @@ import org.gbif.dwc.terms.Term;
 
 public enum ALASearchTerm implements Term, Serializable {
   eventTypeHierarchy(),
-  eventHierarchy();
+  eventHierarchy(),
+  measurementOfFactTypes();
 
   private static final URI NS_URI = URI.create("http://ala.org.au/terms/1.0/");
   private static final String PREFIX = "ala";

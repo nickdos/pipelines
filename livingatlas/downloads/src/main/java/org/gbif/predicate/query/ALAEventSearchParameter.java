@@ -18,6 +18,7 @@ public enum ALAEventSearchParameter implements SearchParameter {
   taxonKey(String.class),
   eventHierarchy(String.class),
   eventTypeHierarchy(String.class),
+  measurementOfFactTypes(String.class),
   locationID(String.class),
   countryCode(String.class),
   year(Integer.class),
