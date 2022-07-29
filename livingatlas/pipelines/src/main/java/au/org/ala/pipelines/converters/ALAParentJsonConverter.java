@@ -252,6 +252,7 @@ public class ALAParentJsonConverter {
       builder.setEventTypeHierarchyJoined(String.join(" / ", eventTypes));
       builder.setEventHierarchyLevels(eventIDs.size());
     } else {
+      // add the eventID and parentEventID to hierarchy for consistency
       List<String> eventHierarchy = new ArrayList<>();
       if (builder.getParentEventID() != null) {
         eventHierarchy.add(builder.getParentEventID());
@@ -260,6 +261,13 @@ public class ALAParentJsonConverter {
         eventHierarchy.add(builder.getEventID());
       }
       builder.setEventHierarchy(eventHierarchy);
+
+      // add the single type to hierarchy for consistency
+      List<String> eventTypeHierarchy = new ArrayList<>();
+      if (builder.getEventType() != null && builder.getEventType().getConcept() != null) {
+        eventTypeHierarchy.add(builder.getEventType().getConcept());
+      }
+      builder.setEventTypeHierarchy(eventTypeHierarchy);
     }
   }
 

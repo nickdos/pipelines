@@ -1,6 +1,7 @@
 package org.gbif.predicate.query;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.Map;
 import org.gbif.api.model.common.search.SearchParameter;
 import org.gbif.dwc.terms.*;
@@ -14,31 +15,28 @@ public class ALAEventTermsMapper implements SQLTermsMapper<ALAEventSearchParamet
           .put(ALAEventSearchParameter.STATE_PROVINCE, DwcTerm.stateProvince)
           .put(ALAEventSearchParameter.COUNTRY_CODE, DwcTerm.countryCode)
           .put(ALAEventSearchParameter.SAMPLING_PROTOCOL, DwcTerm.samplingProtocol)
-          .put(ALAEventSearchParameter.EVENT_TYPE, GbifTerm.eventType)
+          .put(ALAEventSearchParameter.taxonKey, GbifTerm.taxonKey)
           .put(ALAEventSearchParameter.year, DwcTerm.year)
           .put(ALAEventSearchParameter.month, DwcTerm.month)
           .put(ALAEventSearchParameter.stateProvince, DwcTerm.stateProvince)
           .put(ALAEventSearchParameter.countryCode, DwcTerm.countryCode)
           .put(ALAEventSearchParameter.samplingProtocol, DwcTerm.samplingProtocol)
-          .put(ALAEventSearchParameter.eventType, GbifTerm.eventType)
+          .put(ALAEventSearchParameter.eventTypeHierarchy, ALASearchTerm.eventTypeHierarchy)
+          .put(ALAEventSearchParameter.eventHierarchy, ALASearchTerm.eventHierarchy)
+          .put(ALAEventSearchParameter.datasetKey, GbifTerm.datasetKey)
           .build();
   private static final Map<SearchParameter, Term> ARRAY_STRING_TERMS =
       ImmutableMap.<SearchParameter, Term>builder()
           .put(ALAEventSearchParameter.SAMPLING_PROTOCOL, DwcTerm.samplingProtocol)
           .put(ALAEventSearchParameter.samplingProtocol, DwcTerm.samplingProtocol)
-          .build();
-
-  private static final Map<SearchParameter, Term> DENORMED_TERMS =
-      ImmutableMap.<SearchParameter, Term>builder()
-          .put(ALAEventSearchParameter.STATE_PROVINCE, DwcTerm.stateProvince)
-          .put(ALAEventSearchParameter.COUNTRY_CODE, DwcTerm.countryCode)
-          .put(ALAEventSearchParameter.YEAR, DwcTerm.year)
-          .put(ALAEventSearchParameter.MONTH, DwcTerm.month)
           .put(ALAEventSearchParameter.stateProvince, DwcTerm.stateProvince)
           .put(ALAEventSearchParameter.countryCode, DwcTerm.countryCode)
-          .put(ALAEventSearchParameter.year, DwcTerm.year)
-          .put(ALAEventSearchParameter.month, DwcTerm.month)
+          .put(ALAEventSearchParameter.eventTypeHierarchy, ALASearchTerm.eventTypeHierarchy)
+          .put(ALAEventSearchParameter.eventHierarchy, ALASearchTerm.eventHierarchy)
+          .put(ALAEventSearchParameter.datasetKey, GbifTerm.datasetKey)
           .build();
+
+  private static final Map<SearchParameter, Term> DENORMED_TERMS = Collections.EMPTY_MAP;
 
   @Override
   public Term term(ALAEventSearchParameter searchParameter) {

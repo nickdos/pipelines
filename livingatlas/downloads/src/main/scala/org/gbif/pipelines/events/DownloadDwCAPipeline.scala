@@ -91,7 +91,22 @@ object DownloadDwCAPipeline {
     spark.sparkContext.setLogLevel("ERROR")
     spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
 
-    System.out.println("Load events")
+    System.out.println("Load search index")
+    val eventSearchDF = spark.read.format("avro").
+      load(s"${hdfsPath}/${datasetId}/${attempt}/search/event/*.avro").as("Search")
+
+
+    // get a list columns
+    val exportPath = workingDirectory + jobID + s"/Event/"
+
+    val filterSearchDF = if (queryFilter != ""){
+      // filter "coreTerms", "extensions"
+      eventSearchDF.filter(queryFilter).select(col("Search.id"))
+    } else {
+      eventSearchDF.select(col("Search.id"))
+    }
+
+    System.out.println("Load event core")
     val eventCoreDF = spark.read.format("avro").
       load(s"${hdfsPath}/${datasetId}/${attempt}/event/event/*.avro").as("Core")
 
@@ -103,25 +118,14 @@ object DownloadDwCAPipeline {
     val temporalDF = spark.read.format("avro").
       load(s"${hdfsPath}/${datasetId}/${attempt}/event/temporal/*.avro").as("Temporal")
 
-    System.out.println("Load denorm")
-    val denormDF = spark.read.format("avro").
-      load(s"${hdfsPath}/${datasetId}/${attempt}/event/event_hierarchy/*.avro").as("Denorm")
 
     System.out.println("Join")
-    val downloadDF = eventCoreDF.
-      join(locationDF, col("Core.id") === col("Location.id"), "inner").
-      join(temporalDF, col("Core.id") === col("Temporal.id"), "inner").
-      join(denormDF, col("Core.id") === col("Denorm.id"), "inner")
+    val filterDownloadDF = filterSearchDF.select(col("Search.id")).
+      join(eventCoreDF, col("Search.id") === col("Core.id"), "inner").
+      join(locationDF, col("Search.id") === col("Location.id"), "inner").
+      join(temporalDF, col("Search.id") === col("Temporal.id"), "inner")
 
-    // get a list columns
-    val exportPath = workingDirectory + jobID + s"/Event/"
 
-    val filterDownloadDF = if (queryFilter != ""){
-      // filter "coreTerms", "extensions"
-      downloadDF.filter(queryFilter)
-    } else {
-      downloadDF
-    }
 
     // generate interpreted event export
     System.out.println("Export interpreted event data")

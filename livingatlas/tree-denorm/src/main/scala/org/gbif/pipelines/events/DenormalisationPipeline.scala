@@ -154,13 +154,34 @@ object DenormalisationPipeline {
       .save(s"${hdfsPath}/${datasetId}/${attempt}/event/event_hierarchy/")
   }
 
+  /**
+   * 2 formata
+   *
+   * 1) Single value = [value]
+   * 2) Multi value = ["value1", "value2"]
+   *
+   *
+   * @param elem
+   * @return
+   */
   def toCastStrArray(elem:String): Array[String] = {
+
     if (elem == null || elem.length < 2)
       return Array()
-    elem
-      .replace("\\]","")
-      .replace("\\[","")
-      .replace("\"","").split(",").toArray
+
+    if (elem.startsWith("\\[\"")){
+      //multi value
+      val om = new ObjectMapper()
+      val typeFactory = om.getTypeFactory();
+      val list:java.util.List[String] = om.readValue(elem, typeFactory.constructCollectionType(classOf[java.util.List[String]],classOf[String]));
+      list.toArray(Array[String]())
+    } else {
+      val cleaned = elem
+        .replaceAll("\\]","")
+        .replaceAll("\\[","")
+        .replaceAll("\"","")
+      Array(cleaned)
+    }
   }
 
   def genericRecordToRow(row:Row, sqlType:StructType): Row = {
