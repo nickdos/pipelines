@@ -6,7 +6,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.types.{ArrayType, BooleanType, DoubleType, StringType, StructType}
+import org.apache.spark.sql.types.{ArrayType, BooleanType, DecimalType, DoubleType, IntegerType, LongType, StringType, StructType}
 import org.apache.spark.sql.{Column, DataFrame, Dataset, Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 import org.gbif.api.model.common.search.SearchParameter
@@ -291,6 +291,9 @@ object DownloadDwCAPipeline {
     val primitiveFields = df.schema.fields.filter(structField => {
       if (structField.dataType.isInstanceOf[StringType]
         || structField.dataType.isInstanceOf[DoubleType]
+        || structField.dataType.isInstanceOf[IntegerType]
+        || structField.dataType.isInstanceOf[LongType]
+        || structField.dataType.isInstanceOf[DecimalType]
         || structField.dataType.isInstanceOf[BooleanType]
       ) true else false
     })
