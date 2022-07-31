@@ -219,7 +219,7 @@ public abstract class ParentJsonConverter {
         .setDatasetID(eventCore.getDatasetID())
         .setDatasetName(eventCore.getDatasetName())
         .setSamplingProtocol(eventCore.getSamplingProtocol())
-            // Parent lineage currently causing indexing errors
+        // Parent lineage currently causing indexing errors
         //        .setParentsLineage(convertParents(eventCore.getParentsLineage()))
         .setParentEventID(eventCore.getParentEventID())
         .setLocationID(eventCore.getLocationID());

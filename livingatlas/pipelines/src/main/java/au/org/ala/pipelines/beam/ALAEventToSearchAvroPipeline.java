@@ -36,9 +36,7 @@ import org.gbif.pipelines.transforms.core.*;
 import org.gbif.pipelines.transforms.extension.MeasurementOrFactTransform;
 import org.slf4j.MDC;
 
-/**
- *
- */
+/** */
 @Slf4j
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ALAEventToSearchAvroPipeline {

@@ -8,38 +8,39 @@ import org.junit.Test;
 
 public class EventQueryVisitorTest {
 
-    @Test
-    public void testEventQueryFromJSON2() throws Exception {
+  @Test
+  public void testEventQueryFromJSON2() throws Exception {
 
-      String json =
-          "{\"type\":\"and\","
-              + "\"predicates\":["
-              + "{"
-              + "\"type\":\"in\","
-              + "\"key\":\"STATE_PROVINCE\",\"values\":[\"new south wales\"],"
-              + "\"matchCase\":false"
-              + "}"
-              + "]"
-              + "}";
-      ObjectMapper om = new ObjectMapper();
-      om.addMixIn(SearchParameter.class, ALAEventSearchParameter.class);
-      Predicate predicate = om.readValue(json, Predicate.class);
-      QueryVisitor v = new ALAEventSparkQueryVisitor(new ALAEventTermsMapper());
-      String queryString = v.buildQuery(predicate);
-      System.out.println(queryString);
-    }
+    String json =
+        "{\"type\":\"and\","
+            + "\"predicates\":["
+            + "{"
+            + "\"type\":\"in\","
+            + "\"key\":\"STATE_PROVINCE\",\"values\":[\"new south wales\"],"
+            + "\"matchCase\":false"
+            + "}"
+            + "]"
+            + "}";
+    ObjectMapper om = new ObjectMapper();
+    om.addMixIn(SearchParameter.class, ALAEventSearchParameter.class);
+    Predicate predicate = om.readValue(json, Predicate.class);
+    QueryVisitor v = new ALAEventSparkQueryVisitor(new ALAEventTermsMapper());
+    String queryString = v.buildQuery(predicate);
+    System.out.println(queryString);
+  }
 
-    @Test
-    public void testEventQueryFromJSON() throws Exception {
+  @Test
+  public void testEventQueryFromJSON() throws Exception {
 
-      String json = "{\"type\": \"and\", \"predicates\": [{\"type\": \"in\", \"key\": \"STATE_PROVINCE\",\"values\": [\"Victoria\"]}]}";
-      ObjectMapper om = new ObjectMapper();
-      om.addMixIn(SearchParameter.class, ALAEventSearchParameter.class);
-      Predicate predicate = om.readValue(json, Predicate.class);
-      QueryVisitor v = new ALAEventSparkQueryVisitor(new ALAEventTermsMapper());
-      String queryString = v.buildQuery(predicate);
-      System.out.println(queryString);
-    }
+    String json =
+        "{\"type\": \"and\", \"predicates\": [{\"type\": \"in\", \"key\": \"STATE_PROVINCE\",\"values\": [\"Victoria\"]}]}";
+    ObjectMapper om = new ObjectMapper();
+    om.addMixIn(SearchParameter.class, ALAEventSearchParameter.class);
+    Predicate predicate = om.readValue(json, Predicate.class);
+    QueryVisitor v = new ALAEventSparkQueryVisitor(new ALAEventTermsMapper());
+    String queryString = v.buildQuery(predicate);
+    System.out.println(queryString);
+  }
 
   @Test
   public void testEventRangeQueryFromJSON() throws Exception {

@@ -295,7 +295,8 @@ public class ALAEventToEsIndexPipeline {
     log.info("Adding step 6: Elasticsearch indexing");
     ElasticsearchIO.ConnectionConfiguration esConfig =
         ElasticsearchIO.ConnectionConfiguration.create(
-            options.getEsHosts(), options.getEsIndexName(), "_doc");
+                options.getEsHosts(), options.getEsIndexName(), "_doc")
+            .withConnectTimeout(180000);
 
     if (Objects.nonNull(options.getEsUsername()) && Objects.nonNull(options.getEsPassword())) {
       esConfig =
