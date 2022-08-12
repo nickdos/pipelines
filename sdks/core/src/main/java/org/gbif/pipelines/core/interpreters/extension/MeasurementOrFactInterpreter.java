@@ -1,5 +1,6 @@
 package org.gbif.pipelines.core.interpreters.extension;
 
+import com.google.common.collect.ImmutableList;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -34,6 +35,19 @@ public class MeasurementOrFactInterpreter {
           .map(DwcTerm.measurementMethod, MeasurementOrFact::setMeasurementMethod)
           .map(DwcTerm.measurementRemarks, MeasurementOrFact::setMeasurementRemarks);
 
+  private static final TargetHandler<MeasurementOrFact> EXTENDED_HANDLER =
+      ExtensionInterpretation.extension(Extension.EXTENDED_MEASUREMENT_OR_FACT)
+          .to(MeasurementOrFact::new)
+          .map(DwcTerm.measurementID, MeasurementOrFact::setMeasurementID)
+          .map(DwcTerm.measurementType, MeasurementOrFact::setMeasurementType)
+          .map(DwcTerm.measurementUnit, MeasurementOrFact::setMeasurementUnit)
+          .map(DwcTerm.measurementValue, MeasurementOrFact::setMeasurementValue)
+          .map(DwcTerm.measurementAccuracy, MeasurementOrFact::setMeasurementAccuracy)
+          .map(DwcTerm.measurementDeterminedBy, MeasurementOrFact::setMeasurementDeterminedBy)
+          .map(DwcTerm.measurementDeterminedDate, MeasurementOrFact::setMeasurementDeterminedDate)
+          .map(DwcTerm.measurementMethod, MeasurementOrFact::setMeasurementMethod)
+          .map(DwcTerm.measurementRemarks, MeasurementOrFact::setMeasurementRemarks);
+
   /**
    * Interprets measurements or facts of a {@link ExtendedRecord} and populates a {@link
    * MeasurementOrFactRecord} with the interpreted values.
@@ -43,8 +57,12 @@ public class MeasurementOrFactInterpreter {
     Objects.requireNonNull(mfr);
 
     Result<MeasurementOrFact> result = HANDLER.convert(er);
-
-    mfr.setMeasurementOrFactItems(result.getList());
+    Result<MeasurementOrFact> extendedResult = EXTENDED_HANDLER.convert(er);
+    mfr.setMeasurementOrFactItems(
+        ImmutableList.<MeasurementOrFact>builder()
+            .addAll(result.getList())
+            .addAll(extendedResult.getList())
+            .build());
     mfr.getIssues().setIssueList(result.getIssuesAsList());
   }
 }
