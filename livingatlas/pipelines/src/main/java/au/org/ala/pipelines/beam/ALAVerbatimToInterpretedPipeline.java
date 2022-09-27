@@ -1,5 +1,6 @@
 package au.org.ala.pipelines.beam;
 
+import au.org.ala.kvs.ALANameMatchConfig;
 import au.org.ala.kvs.ALAPipelinesConfig;
 import au.org.ala.kvs.ALAPipelinesConfigFactory;
 import au.org.ala.kvs.cache.ALAAttributionKVStoreFactory;
@@ -22,9 +23,7 @@ import au.org.ala.utils.ValidationUtils;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.UnaryOperator;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -146,7 +145,7 @@ public class ALAVerbatimToInterpretedPipeline {
     List<DateComponentOrdering> dateComponentOrdering =
         options.getDefaultDateFormat() == null
             ? config.getGbifConfig().getDefaultDateFormat()
-            : options.getDefaultDateFormat();
+            : Arrays.asList(DateComponentOrdering.DMY_FORMATS);
 
     String id = Long.toString(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC));
 
@@ -224,6 +223,10 @@ public class ALAVerbatimToInterpretedPipeline {
             .kingdomCheckStoreSupplier(
                 ALANameCheckKVStoreFactory.getInstanceSupplier("kingdom", config))
             .dataResourceStoreSupplier(ALAAttributionKVStoreFactory.getInstanceSupplier(config))
+            .alaNameMatchConfig(
+                config.getAlaNameMatchConfig() != null
+                    ? config.getAlaNameMatchConfig()
+                    : new ALANameMatchConfig())
             .create();
 
     // ALA specific - Location

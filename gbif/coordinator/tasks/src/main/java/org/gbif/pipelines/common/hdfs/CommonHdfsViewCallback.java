@@ -9,12 +9,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.curator.framework.CuratorFramework;
 import org.gbif.api.model.pipelines.StepRunner;
-import org.gbif.common.messaging.AbstractMessageCallback;
-import org.gbif.common.messaging.api.MessagePublisher;
-import org.gbif.common.messaging.api.messages.PipelineBasedMessage;
+import org.gbif.common.messaging.api.messages.PipelinesEventsInterpretedMessage;
 import org.gbif.common.messaging.api.messages.PipelinesInterpretationMessage;
+import org.gbif.common.messaging.api.messages.PipelinesInterpretedMessage;
 import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.pipelines.common.PipelinesVariables.Metrics;
 import org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType;
@@ -25,41 +23,18 @@ import org.gbif.pipelines.common.process.ProcessRunnerBuilder.ProcessRunnerBuild
 import org.gbif.pipelines.common.utils.HdfsUtils;
 import org.gbif.pipelines.core.pojo.HdfsConfigs;
 import org.gbif.pipelines.ingest.java.pipelines.HdfsViewPipeline;
-import org.gbif.pipelines.tasks.PipelinesCallback;
-import org.gbif.pipelines.tasks.StepHandler;
 import org.gbif.pipelines.tasks.occurrences.interpretation.InterpreterConfiguration;
-import org.gbif.registry.ws.client.pipelines.PipelinesHistoryClient;
 
 /** Callback which is called when an instance {@link PipelinesInterpretationMessage} is received. */
 @Slf4j
-@AllArgsConstructor
-public abstract class HdfsViewCallback<
-        I extends PipelinesInterpretationMessage, B extends PipelineBasedMessage>
-    extends AbstractMessageCallback<I> implements StepHandler<I, B> {
+@AllArgsConstructor(staticName = "create")
+public class CommonHdfsViewCallback {
 
-  protected final org.gbif.pipelines.common.hdfs.HdfsViewConfiguration config;
-  private final MessagePublisher publisher;
-  private final CuratorFramework curator;
-  private final PipelinesHistoryClient historyClient;
+  private final HdfsViewConfiguration config;
   private final ExecutorService executor;
 
-  @Override
-  public void handleMessage(I message) {
-    PipelinesCallback.<I, B>builder()
-        .historyClient(historyClient)
-        .config(config)
-        .curator(curator)
-        .stepType(config.stepType)
-        .publisher(publisher)
-        .message(message)
-        .handler(this)
-        .build()
-        .handleMessage();
-  }
-
   /** Main message processing logic, creates a terminal java process, which runs */
-  @Override
-  public Runnable createRunnable(I message) {
+  public Runnable createRunnable(PipelinesInterpretationMessage message) {
     return () -> {
       try {
 
@@ -92,17 +67,11 @@ public abstract class HdfsViewCallback<
     };
   }
 
-  @Override
-  public abstract B createOutgoingMessage(I message);
-
-  public abstract String routingKey();
-
   /**
    * Only correct messages can be handled, by now is only messages with the same runner as runner in
    * service config {@link HdfsViewConfiguration#processRunner}
    */
-  @Override
-  public boolean isMessageCorrect(I message) {
+  public boolean isMessageCorrect(PipelinesInterpretationMessage message) {
     if (Strings.isNullOrEmpty(message.getRunner())) {
       throw new IllegalArgumentException("Runner can't be null or empty " + message);
     }
@@ -122,10 +91,12 @@ public abstract class HdfsViewCallback<
     HdfsViewPipeline.run(builder.build().buildOptions(), executor);
   }
 
-  private void runDistributed(I message, ProcessRunnerBuilderBuilder builder)
+  private void runDistributed(
+      PipelinesInterpretationMessage message, ProcessRunnerBuilderBuilder builder)
       throws IOException, InterruptedException {
 
     long recordsNumber = getRecordNumber(message);
+    log.info("Calculate job's settings based on {} records", recordsNumber);
     SparkSettings sparkSettings = SparkSettings.create(config.sparkConfig, recordsNumber);
 
     builder.sparkSettings(sparkSettings);
@@ -144,14 +115,20 @@ public abstract class HdfsViewCallback<
    * Reads number of records from an archive-to-avro metadata file, verbatim-to-interpreted contains
    * attempted records count, which is not accurate enough
    */
-  private long getRecordNumber(I message) throws IOException {
+  private long getRecordNumber(PipelinesInterpretationMessage message) throws IOException {
     String datasetId = message.getDatasetUuid().toString();
     String attempt = Integer.toString(message.getAttempt());
     String metaFileName = new InterpreterConfiguration().metaFileName;
     String metaPath =
         String.join("/", config.stepConfig.repositoryPath, datasetId, attempt, metaFileName);
 
-    Long messageNumber = message.getNumberOfInterpretationRecords();
+    Long messageNumber = null;
+    if (message instanceof PipelinesInterpretedMessage) {
+      messageNumber = ((PipelinesInterpretedMessage) message).getNumberOfRecords();
+    } else if (message instanceof PipelinesEventsInterpretedMessage) {
+      messageNumber = ((PipelinesEventsInterpretedMessage) message).getNumberOfEventRecords();
+    }
+
     HdfsConfigs hdfsConfigs =
         HdfsConfigs.create(config.stepConfig.hdfsSiteConfig, config.stepConfig.coreSiteConfig);
     Optional<Long> fileNumber =
@@ -174,7 +151,7 @@ public abstract class HdfsViewCallback<
     return fileNumber.get();
   }
 
-  private int computeNumberOfShards(I message) throws IOException {
+  private int computeNumberOfShards(PipelinesInterpretationMessage message) throws IOException {
     String datasetId = message.getDatasetUuid().toString();
     String attempt = Integer.toString(message.getAttempt());
     String dirPath =
@@ -183,7 +160,9 @@ public abstract class HdfsViewCallback<
             config.stepConfig.repositoryPath,
             datasetId,
             attempt,
-            DwcTerm.Occurrence.simpleName().toLowerCase());
+            config.recordType == RecordType.EVENT
+                ? DwcTerm.Event.simpleName().toLowerCase()
+                : DwcTerm.Occurrence.simpleName().toLowerCase());
     HdfsConfigs hdfsConfigs =
         HdfsConfigs.create(config.stepConfig.hdfsSiteConfig, config.stepConfig.coreSiteConfig);
     long sizeByte = HdfsUtils.getFileSizeByte(hdfsConfigs, dirPath);

@@ -3,19 +3,18 @@ package au.org.ala.pipelines.converters;
 import static org.gbif.pipelines.core.utils.ModelUtils.extractOptValue;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.gbif.dwc.terms.DwcTerm;
+import org.gbif.dwc.terms.GbifTerm;
 import org.gbif.pipelines.core.converters.JsonConverter;
 import org.gbif.pipelines.io.avro.*;
-import org.gbif.pipelines.io.avro.json.GbifClassification;
-import org.gbif.pipelines.io.avro.json.MeasurementOrFactJsonRecord;
-import org.gbif.pipelines.io.avro.json.OccurrenceJsonRecord;
-import org.gbif.pipelines.io.avro.json.Taxonomy;
+import org.gbif.pipelines.io.avro.Parent;
+import org.gbif.pipelines.io.avro.json.*;
 
 @Slf4j
 @Builder
@@ -29,8 +28,11 @@ public class ALAOccurrenceJsonConverter {
   private final ALATaxonRecord taxon;
   private final MultimediaRecord multimedia;
   private final ExtendedRecord verbatim;
+  private final EventCoreRecord eventCore;
 
-  private final DenormalisedEvent denormalisedEvent;
+  private final EventInheritedRecord eventInheritedRecord;
+  private final LocationInheritedRecord locationInheritedRecord;
+  private final TemporalInheritedRecord temporalInheritedRecord;
 
   private final MeasurementOrFactRecord measurementOrFact;
 
@@ -48,8 +50,8 @@ public class ALAOccurrenceJsonConverter {
     mapTaxonRecord(builder);
     mapMultimediaRecord(builder);
     mapExtendedRecord(builder);
-    mapDenormalisedEvent(builder);
     mapMeasurementOrFactRecord(builder);
+    mapInherited(builder);
 
     // synthesize a locationID if one isnt provided
     if (builder.getLocationID() == null
@@ -76,6 +78,102 @@ public class ALAOccurrenceJsonConverter {
         .setDatasetTitle(metadata.getDataResourceName());
   }
 
+  private void mapInherited(OccurrenceJsonRecord.Builder builder) {
+
+    boolean hasCoordsInfo = builder.getDecimalLatitude() != null;
+    boolean hasCountryInfo = builder.getCountryCode() != null;
+    boolean hasStateInfo = builder.getStateProvince() != null;
+    boolean hasYearInfo = builder.getYear() != null;
+    boolean hasMonthInfo = builder.getMonth() != null;
+    boolean hasLocationID = builder.getLocationID() != null;
+
+    // extract location & temporal information from
+    if (!hasYearInfo && temporalInheritedRecord.getYear() != null) {
+      builder.setYear(temporalInheritedRecord.getYear());
+    }
+
+    if (!hasMonthInfo && temporalInheritedRecord.getMonth() != null) {
+      builder.setMonth(temporalInheritedRecord.getMonth());
+    }
+
+    if (!hasCountryInfo && locationInheritedRecord.getCountryCode() != null) {
+      builder.setCountryCode(locationInheritedRecord.getCountryCode());
+    }
+
+    if (!hasStateInfo && locationInheritedRecord.getStateProvince() != null) {
+      builder.setStateProvince(locationInheritedRecord.getStateProvince());
+    }
+
+    if (!hasCoordsInfo
+            && locationInheritedRecord.getDecimalLatitude() != null
+            && locationInheritedRecord.getDecimalLongitude() != null) {
+      builder
+              .setHasCoordinate(true)
+              .setDecimalLatitude(locationInheritedRecord.getDecimalLatitude())
+              .setDecimalLongitude(locationInheritedRecord.getDecimalLongitude())
+              // geo_point
+              .setCoordinates(
+                      JsonConverter.convertCoordinates(
+                              locationInheritedRecord.getDecimalLongitude(),
+                              locationInheritedRecord.getDecimalLatitude()))
+              // geo_shape
+              .setScoordinates(
+                      JsonConverter.convertScoordinates(
+                              locationInheritedRecord.getDecimalLongitude(),
+                              locationInheritedRecord.getDecimalLatitude()));
+    }
+
+    if (!hasLocationID && eventInheritedRecord.getLocationID() != null) {
+      builder.setLocationID(eventInheritedRecord.getLocationID());
+    }
+
+    if (eventCore != null && eventCore.getParentsLineage() != null
+            && !eventCore.getParentsLineage().isEmpty()) {
+
+      List<String> eventIDs = eventCore.getParentsLineage().stream()
+              .sorted(Comparator.comparingInt(org.gbif.pipelines.io.avro.Parent::getOrder).reversed())
+              .map(e -> e.getId()).collect(Collectors.toList());
+      eventIDs.add(eventCore.getId());
+
+      List<String> eventTypes = eventCore.getParentsLineage().stream()
+              .sorted(Comparator.comparingInt(org.gbif.pipelines.io.avro.Parent::getOrder).reversed())
+              .map(e -> e.getEventType()).collect(Collectors.toList());
+
+      if (eventCore.getEventType() != null){
+        eventTypes.add(eventCore.getEventType().getConcept());
+      } else {
+        String rawEventType = verbatim.getCoreTerms().get(GbifTerm.eventType.qualifiedName());
+        if (rawEventType != null){
+          eventTypes.add(rawEventType);
+        }
+      }
+
+      // add the eventID / eventy
+      builder.setEventTypeHierarchy(eventTypes);
+      builder.setEventTypeHierarchyJoined(String.join(" / ", eventTypes));
+
+      builder.setEventHierarchy(eventIDs);
+      builder.setEventHierarchyJoined(String.join(" / ", eventIDs));
+      builder.setEventHierarchyLevels(eventIDs.size());
+
+    } else {
+      // add the eventID and parentEventID to hierarchy for consistency
+      List<String> eventHierarchy = new ArrayList<>();
+      if (builder.getParentEventId() != null) {
+        eventHierarchy.add(builder.getParentEventId());
+      }
+      if (builder.getEventId() != null) {
+        eventHierarchy.add(builder.getEventId());
+      }
+      builder.setEventHierarchy(eventHierarchy);
+
+      // add the single type to hierarchy for consistency
+      List<String> eventTypeHierarchy = new ArrayList<>();
+      eventTypeHierarchy.add("Occurrence");
+      builder.setEventTypeHierarchy(eventTypeHierarchy);
+    }
+  }
+
   private void mapBasicRecord(OccurrenceJsonRecord.Builder builder) {
 
     // Simple
@@ -100,7 +198,7 @@ public class ALAOccurrenceJsonConverter {
         .setPreparations(basic.getPreparations())
         .setSamplingProtocol(basic.getSamplingProtocol());
 
-    //         Agent
+    // Agent
     builder
         .setIdentifiedByIds(JsonConverter.convertAgentList(basic.getIdentifiedByIds()))
         .setRecordedByIds(JsonConverter.convertAgentList(basic.getRecordedByIds()));
@@ -127,95 +225,6 @@ public class ALAOccurrenceJsonConverter {
         .ifPresent(builder::setSamplingProtocolJoined);
     JsonConverter.convertToMultivalue(basic.getOtherCatalogNumbers())
         .ifPresent(builder::setOtherCatalogNumbersJoined);
-  }
-
-  protected static Optional<org.gbif.pipelines.io.avro.json.VocabularyConcept>
-      convertVocabularyConcept(org.gbif.pipelines.io.avro.VocabularyConcept concepts) {
-    if (concepts == null) {
-      return Optional.empty();
-    }
-    return Optional.of(
-        org.gbif.pipelines.io.avro.json.VocabularyConcept.newBuilder()
-            .setConcept(concepts.getConcept())
-            .setLineage(concepts.getLineage())
-            .build());
-  }
-
-  private void mapDenormalisedEvent(OccurrenceJsonRecord.Builder builder) {
-
-    if (denormalisedEvent.getParents() != null & !denormalisedEvent.getParents().isEmpty()) {
-
-      List<String> eventTypes = new ArrayList<>();
-      List<String> eventIDs = new ArrayList<>();
-
-      boolean hasCoordsInfo = builder.getDecimalLatitude() != null;
-      boolean hasCountryInfo = builder.getCountryCode() != null;
-      boolean hasStateInfo = builder.getStateProvince() != null;
-      boolean hasYearInfo = builder.getYear() != null;
-      boolean hasMonthInfo = builder.getMonth() != null;
-      boolean hasLocationID = builder.getLocationID() != null;
-
-      // extract location & temporal information from
-      denormalisedEvent
-          .getParents()
-          .forEach(
-              parent -> {
-                if (!hasYearInfo && parent.getYear() != null) {
-                  builder.setYear(parent.getYear());
-                }
-
-                if (!hasMonthInfo && parent.getMonth() != null) {
-                  builder.setMonth(parent.getMonth());
-                }
-
-                if (!hasCountryInfo && parent.getCountryCode() != null) {
-                  builder.setCountryCode(parent.getCountryCode());
-                }
-
-                if (!hasStateInfo && parent.getStateProvince() != null) {
-                  builder.setStateProvince(parent.getStateProvince());
-                }
-
-                if (!hasCoordsInfo
-                    && parent.getDecimalLatitude() != null
-                    && parent.getDecimalLongitude() != null) {
-                  builder
-                      .setHasCoordinate(true)
-                      .setDecimalLatitude(parent.getDecimalLatitude())
-                      .setDecimalLongitude(parent.getDecimalLongitude())
-                      // geo_point
-                      .setCoordinates(
-                          JsonConverter.convertCoordinates(
-                              parent.getDecimalLongitude(), parent.getDecimalLatitude()))
-                      // geo_shape
-                      .setScoordinates(
-                          JsonConverter.convertScoordinates(
-                              parent.getDecimalLongitude(), parent.getDecimalLatitude()));
-                }
-
-                if (!hasLocationID && parent.getLocationID() != null) {
-                  builder.setLocationID(parent.getLocationID());
-                }
-
-                eventIDs.add(parent.getEventID());
-                eventTypes.add(parent.getEventType());
-              });
-
-      builder.setEventHierarchy(eventIDs);
-      builder.setEventTypeHierarchy(eventTypes);
-      builder.setEventHierarchyJoined(String.join(" / ", eventIDs));
-      builder.setEventTypeHierarchyJoined(String.join(" / ", eventTypes));
-      builder.setEventHierarchyLevels(eventIDs.size());
-    } else {
-      List<String> eventHierarchy = new ArrayList<>();
-      if (builder.getParentEventId() != null) {
-        eventHierarchy.add(builder.getParentEventId());
-      }
-      if (builder.getEventId() != null) {
-        eventHierarchy.add(builder.getEventId());
-      }
-      builder.setEventHierarchy(eventHierarchy);
-    }
   }
 
   private void mapTemporalRecord(OccurrenceJsonRecord.Builder builder) {

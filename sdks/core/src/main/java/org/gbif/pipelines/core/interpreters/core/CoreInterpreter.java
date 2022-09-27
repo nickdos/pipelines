@@ -10,7 +10,6 @@ import static org.gbif.pipelines.core.utils.ModelUtils.extractValue;
 import com.google.common.base.Strings;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -104,14 +103,25 @@ public class CoreInterpreter {
 
       // parent event IDs
       List<Parent> parents = new ArrayList<>();
+      int order = 1;
       while (parentEventID != null) {
-        Map<String, String> parentValues =
-            erWithParents.getOrDefault(parentEventID, new HashMap<>());
+        Map<String, String> parentValues = erWithParents.get(parentEventID);
+
+        if (parentValues == null) {
+          // case when there is no event with that parentEventID
+          break;
+        }
 
         Parent.Builder parentBuilder = Parent.newBuilder().setId(parentEventID);
         VocabularyInterpreter.interpretVocabulary(
                 GbifTerm.eventType, parentValues.get(GbifTerm.eventType.name()), vocabularyService)
             .ifPresent(c -> parentBuilder.setEventType(c.getConcept()));
+
+        if (parentBuilder.getEventType() == null){
+          parentBuilder.setEventType(parentValues.get(GbifTerm.eventType.name()));
+        }
+
+        parentBuilder.setOrder(order++);
         parents.add(parentBuilder.build());
 
         parentEventID = parentValues.get(DwcTerm.parentEventID.name());

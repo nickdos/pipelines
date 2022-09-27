@@ -18,6 +18,9 @@ import org.apache.beam.sdk.values.TupleTag;
 import org.gbif.pipelines.core.converters.MultimediaConverter;
 import org.gbif.pipelines.io.avro.*;
 import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
+import org.gbif.pipelines.io.avro.json.EventInheritedRecord;
+import org.gbif.pipelines.io.avro.json.LocationInheritedRecord;
+import org.gbif.pipelines.io.avro.json.TemporalInheritedRecord;
 
 /**
  * Beam level transformation for the ES output json. The transformation consumes objects, which
@@ -80,6 +83,10 @@ public class ALAParentJsonTransform implements Serializable {
   private final TupleTag<DenormalisedEvent> denormalisedEventTag;
   private final TupleTag<String[]> samplingProtocolsTag;
 
+  @NonNull private final TupleTag<LocationInheritedRecord> locationInheritedRecordTag;
+  @NonNull private final TupleTag<TemporalInheritedRecord> temporalInheritedRecordTag;
+  @NonNull private final TupleTag<EventInheritedRecord> eventInheritedRecordTag;
+
   public SingleOutput<KV<String, CoGbkResult>, String> converter() {
 
     DoFn<KV<String, CoGbkResult>, String> fn =
@@ -106,9 +113,6 @@ public class ALAParentJsonTransform implements Serializable {
             LocationRecord lr =
                 v.getOnly(locationRecordTag, LocationRecord.newBuilder().setId(k).build());
 
-            //            ALATaxonRecord txr = v.getOnly(taxonRecordTag,
-            // TaxonRecord.newBuilder().setId(k).build());
-
             // Extension
             MultimediaRecord mr =
                 v.getOnly(multimediaRecordTag, MultimediaRecord.newBuilder().setId(k).build());
@@ -116,9 +120,18 @@ public class ALAParentJsonTransform implements Serializable {
             AudubonRecord ar =
                 v.getOnly(audubonRecordTag, AudubonRecord.newBuilder().setId(k).build());
 
-            // De-normed events
-            DenormalisedEvent de =
-                v.getOnly(denormalisedEventTag, DenormalisedEvent.newBuilder().setId(k).build());
+            // Inherited
+            EventInheritedRecord eir =
+                v.getOnly(
+                    eventInheritedRecordTag, EventInheritedRecord.newBuilder().setId(k).build());
+            LocationInheritedRecord lir =
+                v.getOnly(
+                    locationInheritedRecordTag,
+                    LocationInheritedRecord.newBuilder().setId(k).build());
+            TemporalInheritedRecord tir =
+                v.getOnly(
+                    temporalInheritedRecordTag,
+                    TemporalInheritedRecord.newBuilder().setId(k).build());
 
             MeasurementOrFactRecord mofr =
                 v.getOnly(
@@ -127,12 +140,10 @@ public class ALAParentJsonTransform implements Serializable {
 
             MultimediaRecord mmr = MultimediaConverter.merge(mr, imr, ar);
 
-            //             Derived metadata
+            // Derived metadata
             DerivedMetadataRecord dmr =
                 v.getOnly(
                     derivedMetadataRecordTag, DerivedMetadataRecord.newBuilder().setId(k).build());
-
-            String[] sps = v.getOnly(samplingProtocolsTag, new String[0]);
 
             // Convert and
             String json =
@@ -144,11 +155,11 @@ public class ALAParentJsonTransform implements Serializable {
                     .location(lr)
                     .multimedia(mmr)
                     .verbatim(er)
-                    //                    .taxon(txr)
                     .derivedMetadata(dmr)
                     .measurementOrFactRecord(mofr)
-                    .denormalisedEvent(de)
-                    .samplingProtocols(sps)
+                    .locationInheritedRecord(lir)
+                    .temporalInheritedRecord(tir)
+                    .eventInheritedRecord(eir)
                     .build()
                     .toJson();
 

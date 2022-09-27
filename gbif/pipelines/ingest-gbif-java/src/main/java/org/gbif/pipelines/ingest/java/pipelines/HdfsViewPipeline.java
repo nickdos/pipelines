@@ -277,15 +277,19 @@ public class HdfsViewPipeline {
             .metrics(metrics)
             .metadata(metadataMapFeature.get().values().iterator().next())
             .verbatimMap(verbatimMapFeature.get())
-            .clusteringMap(clusteringMapFeature.get())
-            .basicMap(basicMapFeature.get())
             .temporalMap(temporalMapFeature.get())
             .locationMap(locationMapFeature.get())
             .taxonMap(taxonMapFeature.get())
-            .grscicollMap(grscicollMapFeature.get())
             .multimediaMap(multimediaMapFeature.get())
             .imageMap(imageMapFeature.get())
             .audubonMap(audubonMapFeature.get());
+
+    if (OCCURRENCE == recordType) {
+      builder
+          .basicMap(basicMapFeature.get())
+          .grscicollMap(grscicollMapFeature.get())
+          .clusteringMap(clusteringMapFeature.get());
+    }
 
     if (RecordType.EVENT == recordType) {
       CompletableFuture<Map<String, EventCoreRecord>> eventCoreMapFeature =
@@ -734,6 +738,9 @@ public class HdfsViewPipeline {
     } else {
       SharedLockUtils.doHdfsPrefixLock(options, action);
     }
+    // Delete root directory of table records
+    FsUtils.deleteIfExist(
+        hdfsConfigs, PathBuilder.buildFilePathViewUsingInputPath(options, recordType));
 
     MetricsHandler.saveCountersToInputPathFile(options, metrics.getMetricsResult());
     log.info("Pipeline has been finished - {}", LocalDateTime.now());

@@ -68,6 +68,8 @@ public class JsonConverter {
               Extension.AUDUBON.getRowType(),
               Extension.IMAGE.getRowType()));
 
+  private static final String OCCURRENCE_EXT = "http://rs.tdwg.org/dwc/terms/Occurrence";
+
   private static final Map<Character, Character> CHAR_MAP = new HashMap<>(2);
 
   static {
@@ -89,6 +91,7 @@ public class JsonConverter {
   /** Gets the maximum/latest created date of all the records. */
   public static Optional<String> getMaxCreationDate(SpecificRecordBase... recordBases) {
     return Arrays.stream(recordBases)
+        .filter(Objects::nonNull)
         .filter(r -> Objects.nonNull(r.getSchema().getField(Indexing.CREATED)))
         .map(r -> r.get(Indexing.CREATED))
         .filter(Objects::nonNull)
@@ -102,6 +105,11 @@ public class JsonConverter {
   }
 
   public static List<String> convertFieldAll(ExtendedRecord extendedRecord) {
+    return convertFieldAll(extendedRecord, true);
+  }
+
+  public static List<String> convertFieldAll(
+      ExtendedRecord extendedRecord, boolean includeExtensions) {
     Set<String> result = new HashSet<>();
 
     extendedRecord.getCoreTerms().entrySet().stream()
@@ -110,14 +118,16 @@ public class JsonConverter {
         .map(Entry::getValue)
         .forEach(result::add);
 
-    extendedRecord.getExtensions().entrySet().stream()
-        .filter(kv -> INCLUDE_EXT_ALL.contains(kv.getKey()))
-        .map(Entry::getValue)
-        .filter(Objects::nonNull)
-        .flatMap(Collection::stream)
-        .flatMap(map -> map.values().stream())
-        .filter(Objects::nonNull)
-        .forEach(result::add);
+    if (includeExtensions) {
+      extendedRecord.getExtensions().entrySet().stream()
+          .filter(kv -> INCLUDE_EXT_ALL.contains(kv.getKey()))
+          .map(Entry::getValue)
+          .filter(Objects::nonNull)
+          .flatMap(Collection::stream)
+          .flatMap(map -> map.values().stream())
+          .filter(Objects::nonNull)
+          .forEach(result::add);
+    }
 
     return result.stream()
         .flatMap(v -> Stream.of(v.split(ModelUtils.DEFAULT_SEPARATOR)))
@@ -135,15 +145,37 @@ public class JsonConverter {
   }
 
   public static VerbatimRecord convertVerbatimRecord(ExtendedRecord extendedRecord) {
+    return convertVerbatimRecord(extendedRecord, Collections.emptyList());
+  }
+
+  protected static VerbatimRecord convertVerbatimRecord(
+      ExtendedRecord extendedRecord, List<String> excludeExtensions) {
     return VerbatimRecord.newBuilder()
         .setCore(extendedRecord.getCoreTerms())
-        .setParentCoreId(extendedRecord.getParentCoreId())
-        .setExtensions(extendedRecord.getExtensions())
+        .setCoreId(extendedRecord.getCoreId())
+        .setExtensions(filterExtensions(extendedRecord.getExtensions(), excludeExtensions))
         .build();
   }
 
+  public static VerbatimRecord convertVerbatimEventRecord(ExtendedRecord extendedRecord) {
+    return convertVerbatimRecord(extendedRecord, Collections.singletonList(OCCURRENCE_EXT));
+  }
+
+  private static Map<String, List<Map<String, String>>> filterExtensions(
+      Map<String, List<Map<String, String>>> exts, List<String> excludedExtensions) {
+    return exts.entrySet().stream()
+        .filter(e -> !excludedExtensions.contains(e.getKey()))
+        .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
+  }
+
   public static Optional<String> convertToMultivalue(List<String> list) {
-    return list != null && !list.isEmpty() ? Optional.of(String.join("|", list)) : Optional.empty();
+    return list != null && !list.isEmpty()
+        ? Optional.of(getEscapedText(String.join("|", list)))
+        : Optional.empty();
+  }
+
+  public static List<String> getEscapedList(List<String> list) {
+    return list.stream().map(JsonConverter::getEscapedText).collect(Collectors.toList());
   }
 
   public static Optional<String> convertLicense(String license) {

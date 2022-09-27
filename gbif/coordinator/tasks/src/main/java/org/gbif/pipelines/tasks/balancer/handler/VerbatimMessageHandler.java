@@ -4,7 +4,6 @@ import static org.gbif.pipelines.common.ValidatorPredicate.isValidator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -13,7 +12,6 @@ import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.gbif.api.model.pipelines.StepRunner;
-import org.gbif.api.model.pipelines.StepType;
 import org.gbif.api.vocabulary.DatasetType;
 import org.gbif.common.messaging.api.MessagePublisher;
 import org.gbif.common.messaging.api.messages.PipelinesBalancerMessage;
@@ -66,15 +64,13 @@ public class VerbatimMessageHandler {
         && m.getValidationResult().getNumberOfEventRecords() > 0) {
       Set<String> interpretationTypes = new HashSet<>(m.getInterpretTypes());
       interpretationTypes.add(RecordType.EVENT.name());
+      interpretationTypes.remove(RecordType.OCCURRENCE.name());
 
       PipelinesEventsMessage eventsMessage =
           new PipelinesEventsMessage(
               m.getDatasetUuid(),
               m.getAttempt(),
-              new HashSet<>(
-                  Arrays.asList(
-                      StepType.EVENTS_VERBATIM_TO_INTERPRETED.name(),
-                      StepType.EVENTS_INTERPRETED_TO_INDEX.name())),
+              m.getPipelineSteps(),
               m.getValidationResult().getNumberOfEventRecords(),
               m.getValidationResult().getNumberOfRecords(),
               StepRunner.DISTRIBUTED.name(),

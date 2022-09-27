@@ -6,6 +6,7 @@ import static org.gbif.pipelines.common.ValidatorPredicate.isValidator;
 import static org.gbif.pipelines.common.utils.PathUtil.buildDwcaInputPath;
 
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -70,6 +71,15 @@ public class DwcaToAvroCallback extends AbstractMessageCallback<PipelinesDwcaMes
         .handleMessage();
   }
 
+  @Override
+  public String getRouting() {
+    PipelinesDwcaMessage message = new PipelinesDwcaMessage();
+    if (config.validatorOnly) {
+      message.setPipelineSteps(Collections.singleton(StepType.VALIDATOR_DWCA_TO_VERBATIM.name()));
+    }
+    return message.getRoutingKey();
+  }
+
   /** Only correct messages can be handled, by now is only OCCURRENCE type messages */
   @Override
   public boolean isMessageCorrect(PipelinesDwcaMessage message) {
@@ -100,7 +110,10 @@ public class DwcaToAvroCallback extends AbstractMessageCallback<PipelinesDwcaMes
     boolean isValidGenericReport =
         message.getValidationReport().getGenericReport() != null
             && message.getValidationReport().getGenericReport().getCheckedRecords() > 0;
-    return isValidOccurrenceReport || isValidGenericReport;
+    if (config.addEventSteps) {
+      return isValidOccurrenceReport || isValidGenericReport;
+    }
+    return isValidOccurrenceReport;
   }
 
   /** Main message processing logic, converts a DwCA archive to an avro file. */
@@ -173,9 +186,11 @@ public class DwcaToAvroCallback extends AbstractMessageCallback<PipelinesDwcaMes
         if (coreType == DwcTerm.Occurrence || hasOccExt) {
           occurrenceFn.accept(steps);
         }
-        if (coreType == DwcTerm.Event) {
+        if (coreType == DwcTerm.Event && config.addEventSteps) {
+          steps.add(StepType.DWCA_TO_VERBATIM.name());
           steps.add(StepType.EVENTS_VERBATIM_TO_INTERPRETED.name());
           steps.add(StepType.EVENTS_INTERPRETED_TO_INDEX.name());
+          steps.add(StepType.EVENTS_HDFS_VIEW.name());
         }
 
         message.setPipelineSteps(steps);

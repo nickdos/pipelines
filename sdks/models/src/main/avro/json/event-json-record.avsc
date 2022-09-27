@@ -15,32 +15,11 @@
     "type":"record",
     "doc":"Additional information",
     "fields":[
-      // Full-text search field
-      {"name":"all","type":{"type":"array","items":"string"},"default":[]},
       // Internal
       {"name":"id","type":"string","default":null,"doc":""},
-      {"name":"internalId","type":["null","string"],"default":null,"doc":""},
-      {"name":"uniqueKey","type":["null","string"],"default":null,"doc":""},
-      {"name":"firstLoaded","type":["null","string"],"default":null,"doc":""},
-      {"name":"lastCrawled","type":["null","string"],"default":null,"doc":""},
       {"name":"created","type":["null","string"],"default":null,"doc":""},
-      {"name":"crawlId","type":["null","int"],"default":null,"doc":""},
       {"name": "parentsLineage", "type": {"type" : "array", "items" : "Parent"}, "default" : [], "doc":""},
-      // Metadata
-      {"name":"datasetKey","type":["null","string"],"default":null,"doc":""},
-      {"name":"datasetTitle","type":["null","string"],"default":null,"doc":""},
-      {"name":"installationKey","type":["null","string"],"default":null,"doc":""},
-      {"name":"hostingOrganizationKey","type":["null","string"],"default":null,"doc":""},
-      {"name":"endorsingNodeKey","type":["null","string"],"default":null,"doc":""},
-      {"name":"publisherTitle","type":["null","string"],"default":null,"doc":""},
       {"name":"license","type":["null","string"],"default":null,"doc":""},
-      {"name":"protocol","type":["null","string"],"default":null,"doc":""},
-      {"name":"publishingCountry","type":["null","string"],"default":null,"doc":""},
-      {"name":"datasetPublishingCountry","type":["null","string"],"default":null,"doc":""},
-      {"name":"publishingOrganizationKey","type":["null","string"],"default":null,"doc":""},
-      {"name":"networkKeys","type":{"type":"array","items":"string"},"default":null,"doc":""},
-      {"name":"projectId","type":["null","string"],"default":null,"doc":""},
-      {"name":"programmeAcronym","type":["null","string"],"default":null,"doc":""},
       //Derived metadata
       {"name":"derivedMetadata","type":["null","DerivedMetadataRecord"],"default":null,"doc":""},
       // Record-level
@@ -92,23 +71,24 @@
       {"name":"repatriated","type":["null","boolean"],"default":null,"doc":""},
       {"name":"hasGeospatialIssue","type":["null","boolean"],"default":null,"doc":""},
       {"name":"footprintWKT","type":["null","string"],"default":null,"doc":""},
+      {"name":"publishingCountry","type":["null","string"],"default":null,"doc":""},
       // Taxonomy
       {"name":"gbifClassification","type":["null","GbifClassification"],"default":null,"doc":""},
       // Multimedia
       {"name":"mediaTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"mediaLicenses","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"multimediaItems","type":{"type":"array","items":"Multimedia"},"default":null,"doc":""},
+      // MeasurementOrFact
+      {"name":"measurementOrFactTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
+      {"name":"measurementOrFactMethods","type":{"type":"array","items":"string"},"default":null,"doc":""},
+      {"name":"measurementOrFactCount","type":["null","int"],"default":null,"doc":""},
       // Extra
       {"name":"issues","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"notIssues","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"extensions","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"verbatim","type":["null","VerbatimRecord"],"default":null,"doc":""},
-      //Agreegations
+      // Aggregations
       {"name":"occurrenceCount","type":["null","int"],"default":null,"doc":""},
-      // MeasurementOrFact
-      {"name":"measurementOrFactTypes","type":{"type":"array","items":"string"},"default":null,"doc":""},
-      {"name":"measurementOrFactMethods","type":{"type":"array","items":"string"},"default":null,"doc":""},
-      {"name":"measurementOrFactCount","type":["null","int"],"default":null,"doc":""},
       // Denormalised event info
       {"name":"eventHierarchy","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"eventTypeHierarchy","type":{"type":"array","items":"string"},"default":[],"doc":""},

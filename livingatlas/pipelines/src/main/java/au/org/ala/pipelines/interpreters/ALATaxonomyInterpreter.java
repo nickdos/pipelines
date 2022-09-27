@@ -5,7 +5,11 @@ import au.org.ala.names.ws.api.NameSearch;
 import au.org.ala.names.ws.api.NameUsageMatch;
 import au.org.ala.pipelines.vocabulary.ALAOccurrenceIssue;
 import com.google.common.base.Enums;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import lombok.AccessLevel;
@@ -17,7 +21,11 @@ import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.dwc.terms.Term;
 import org.gbif.kvs.KeyValueStore;
 import org.gbif.pipelines.core.utils.ModelUtils;
-import org.gbif.pipelines.io.avro.*;
+import org.gbif.pipelines.io.avro.ALAMatchIssueType;
+import org.gbif.pipelines.io.avro.ALAMatchType;
+import org.gbif.pipelines.io.avro.ALATaxonRecord;
+import org.gbif.pipelines.io.avro.ExtendedRecord;
+import org.gbif.pipelines.io.avro.NameType;
 
 /** Providing taxonomic matching functionality for occurrence records. */
 @Slf4j
@@ -116,7 +124,8 @@ public class ALATaxonomyInterpreter {
    */
   public static BiConsumer<ExtendedRecord, ALATaxonRecord> alaTaxonomyInterpreter(
       final ALACollectoryMetadata dataResource,
-      final KeyValueStore<NameSearch, NameUsageMatch> kvStore) {
+      final KeyValueStore<NameSearch, NameUsageMatch> kvStore,
+      final Boolean matchOnTaxonID) {
     final Map<String, List<String>> hints = dataResource == null ? null : dataResource.getHintMap();
     final Map<String, String> defaults =
         dataResource == null ? null : dataResource.getDefaultDarwinCoreValues();
@@ -129,8 +138,12 @@ public class ALATaxonomyInterpreter {
         if (genus == null) {
           genus = extractValue(er, DwcTerm.genericName, defaults);
         }
+        NameSearch.NameSearchBuilder builder = NameSearch.builder();
+        if (matchOnTaxonID) {
+          builder.taxonID(extractValue(er, DwcTerm.taxonID, defaults));
+        }
         NameSearch matchRequest =
-            NameSearch.builder()
+            builder
                 .kingdom(extractValue(er, DwcTerm.kingdom, defaults))
                 .phylum(extractValue(er, DwcTerm.phylum, defaults))
                 .clazz(extractValue(er, DwcTerm.class_, defaults))
@@ -277,10 +290,5 @@ public class ALATaxonomyInterpreter {
       value = defaults.get(term.simpleName());
     }
     return value;
-  }
-
-  /** Sets the parentId field. */
-  public static void setParentId(ExtendedRecord er, ALATaxonRecord tr) {
-    Optional.ofNullable(er.getParentCoreId()).ifPresent(tr::setParentId);
   }
 }

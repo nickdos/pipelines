@@ -25,6 +25,7 @@
     "fields":[
       {"name": "id","type":"string"},
       {"name": "parentId","type":["null","string"],"default":null, "doc":"Parent record identifier"},
+      {"name": "coreId","type":["null","string"],"default":null, "doc":"Id of the core record when this record belongs to an extension"},
       {"name": "scientificName", "type": ["null", "string"], "default" : null },
       {"name": "scientificNameAuthorship", "type": ["null", "string"], "default" : null },
       {"name": "taxonConceptID", "type": ["null", "string"], "default" : null },

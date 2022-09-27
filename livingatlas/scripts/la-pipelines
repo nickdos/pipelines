@@ -94,7 +94,7 @@ dwca-avro --> interpret --> validate --> uuid --> sds --> image-load ... │
 -  'jackknife' adds an aggregated jackknife AVRO for all datasets. Requires samping-avro. After running a full 'index' is required.
 -  'solr' reads index records in AVRO and submits them to SOLR;
 -  'solr-schema' sync schema
--  'elastic-event' reads verbatim.avro, interprets it and writes the interpreted data and the issues to Avro files;
+-  'elastic-event' reads index records in AVRO and submits them to ElasticSearch;
 -  'archive-list' dumps out a list of archives that can be ingested to '/tmp/dataset-archive-list.csv';
 -  'dataset-list' dumps out a list of datasets that have been ingested to '/tmp/dataset-counts.csv';
 -  'validation-report' dumps out a CSV list of datasets ready to be indexed to '/tmp/validation-report.csv';

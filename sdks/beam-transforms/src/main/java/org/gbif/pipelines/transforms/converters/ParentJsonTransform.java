@@ -16,8 +16,21 @@ import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
 import org.gbif.pipelines.core.converters.MultimediaConverter;
 import org.gbif.pipelines.core.converters.specific.GbifParentJsonConverter;
-import org.gbif.pipelines.io.avro.*;
+import org.gbif.pipelines.io.avro.AudubonRecord;
+import org.gbif.pipelines.io.avro.EventCoreRecord;
+import org.gbif.pipelines.io.avro.ExtendedRecord;
+import org.gbif.pipelines.io.avro.IdentifierRecord;
+import org.gbif.pipelines.io.avro.ImageRecord;
+import org.gbif.pipelines.io.avro.LocationRecord;
+import org.gbif.pipelines.io.avro.MeasurementOrFactRecord;
+import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.MultimediaRecord;
+import org.gbif.pipelines.io.avro.TaxonRecord;
+import org.gbif.pipelines.io.avro.TemporalRecord;
 import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
+import org.gbif.pipelines.io.avro.json.EventInheritedRecord;
+import org.gbif.pipelines.io.avro.json.LocationInheritedRecord;
+import org.gbif.pipelines.io.avro.json.TemporalInheritedRecord;
 
 /**
  * Beam level transformation for the ES output json. The transformation consumes objects, which
@@ -69,7 +82,7 @@ public class ParentJsonTransform implements Serializable {
   @NonNull private final TupleTag<IdentifierRecord> identifierRecordTag;
   @NonNull private final TupleTag<TemporalRecord> temporalRecordTag;
   @NonNull private final TupleTag<LocationRecord> locationRecordTag;
-  private final TupleTag<TaxonRecord> taxonRecordTag;
+  @NonNull private final TupleTag<TaxonRecord> taxonRecordTag;
   // Extension
   @NonNull private final TupleTag<MultimediaRecord> multimediaRecordTag;
   @NonNull private final TupleTag<ImageRecord> imageRecordTag;
@@ -77,7 +90,10 @@ public class ParentJsonTransform implements Serializable {
   @NonNull private final PCollectionView<MetadataRecord> metadataView;
   @NonNull private final TupleTag<DerivedMetadataRecord> derivedMetadataRecordTag;
   @NonNull private final TupleTag<MeasurementOrFactRecord> measurementOrFactRecordTag;
-  private final TupleTag<DenormalisedEvent> denormalisedEventTag;
+
+  @NonNull private final TupleTag<LocationInheritedRecord> locationInheritedRecordTag;
+  @NonNull private final TupleTag<TemporalInheritedRecord> temporalInheritedRecordTag;
+  @NonNull private final TupleTag<EventInheritedRecord> eventInheritedRecordTag;
 
   public SingleOutput<KV<String, CoGbkResult>, String> converter() {
 
@@ -104,9 +120,7 @@ public class ParentJsonTransform implements Serializable {
                 v.getOnly(temporalRecordTag, TemporalRecord.newBuilder().setId(k).build());
             LocationRecord lr =
                 v.getOnly(locationRecordTag, LocationRecord.newBuilder().setId(k).build());
-
-            //            ALATaxonRecord txr = v.getOnly(taxonRecordTag,
-            // TaxonRecord.newBuilder().setId(k).build());
+            TaxonRecord txr = v.getOnly(taxonRecordTag, TaxonRecord.newBuilder().setId(k).build());
 
             // Extension
             MultimediaRecord mr =
@@ -114,11 +128,6 @@ public class ParentJsonTransform implements Serializable {
             ImageRecord imr = v.getOnly(imageRecordTag, ImageRecord.newBuilder().setId(k).build());
             AudubonRecord ar =
                 v.getOnly(audubonRecordTag, AudubonRecord.newBuilder().setId(k).build());
-
-            // De-normed events
-            DenormalisedEvent de =
-                v.getOnly(denormalisedEventTag, DenormalisedEvent.newBuilder().setId(k).build());
-
             MeasurementOrFactRecord mofr =
                 v.getOnly(
                     measurementOrFactRecordTag,
@@ -127,10 +136,26 @@ public class ParentJsonTransform implements Serializable {
             MultimediaRecord mmr = MultimediaConverter.merge(mr, imr, ar);
 
             // Derived metadata
-            //            DerivedMetadataRecord dmr =
-            //                v.getOnly(
-            //                    derivedMetadataRecordTag,
-            // DerivedMetadataRecord.newBuilder().setId(k).build());
+            DerivedMetadataRecord dmr =
+                v.getOnly(
+                    derivedMetadataRecordTag, DerivedMetadataRecord.newBuilder().setId(k).build());
+
+            // Inherited location fields
+            LocationInheritedRecord lir =
+                v.getOnly(
+                    locationInheritedRecordTag,
+                    LocationInheritedRecord.newBuilder().setId(k).build());
+
+            // Inherited temporal fields
+            TemporalInheritedRecord tir =
+                v.getOnly(
+                    temporalInheritedRecordTag,
+                    TemporalInheritedRecord.newBuilder().setId(k).build());
+
+            // Inherited temporal fields
+            EventInheritedRecord eir =
+                v.getOnly(
+                    eventInheritedRecordTag, EventInheritedRecord.newBuilder().setId(k).build());
 
             // Convert and
             String json =
@@ -142,10 +167,12 @@ public class ParentJsonTransform implements Serializable {
                     .location(lr)
                     .multimedia(mmr)
                     .verbatim(er)
-                    //                    .taxon(txr)
-                    //                    .derivedMetadata(dmr)
+                    .taxon(txr)
+                    .derivedMetadata(dmr)
+                    .locationInheritedRecord(lir)
                     .measurementOrFactRecord(mofr)
-                    .denormalisedEvent(de)
+                    .temporalInheritedRecord(tir)
+                    .eventInheritedRecord(eir)
                     .build()
                     .toJson();
 

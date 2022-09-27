@@ -81,8 +81,6 @@ geocodeConfig:
     path: /data/pipelines-shp/gadm0
     field: FEATURE
 
-
-
 gbifConfig:
   extensionsAllowedForVerbatimSet:
     - http://rs.tdwg.org/ac/terms/Multimedia
@@ -116,8 +114,9 @@ gbifConfig:
       http://rs.tdwg.org/dwc/terms/lifeStage: LifeStage
       http://rs.tdwg.org/dwc/terms/establishmentMeans: EstablishmentMeans
       http://rs.tdwg.org/dwc/terms/pathway: Pathway
-      http://rs.gbif.org/terms/1.0/eventType: EventType
-      http://rs.tdwg.org/dwc/terms/occurrenceStatus: OccurrenceStatus
+
+alaNameMatchConfig:
+  matchOnTaxonID: true
 
 #locationInfoConfig:
 #    countryNamesFile : /data/pipelines-data/resources/countries.txt
@@ -155,6 +154,7 @@ dwca-avro:
 interpret:
   appName: Interpretation for {datasetId}
   interpretationTypes: ALL
+  defaultDateFormat: DMYT,DMY
   inputPath: '{fsPath}/pipelines-data/{datasetId}/1/verbatim.avro'
   # Skips GBIF id generation and copies ids from ExtendedRecord ids
   useExtendedRecordId: true

@@ -63,6 +63,12 @@ public class EventsInterpretationCallback extends AbstractMessageCallback<Pipeli
         .handleMessage();
   }
 
+  /** Run all the events pipelines in distributed mode */
+  @Override
+  public String getRouting() {
+    return new PipelinesEventsMessage().setRunner("*").getRoutingKey();
+  }
+
   @Override
   public boolean isMessageCorrect(PipelinesEventsMessage message) {
     return message.getDatasetType() == DatasetType.SAMPLING_EVENT

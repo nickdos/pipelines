@@ -28,11 +28,11 @@ import org.gbif.pipelines.common.beam.options.EsIndexingPipelineOptions;
 import org.gbif.pipelines.common.beam.options.InterpretationPipelineOptions;
 import org.gbif.pipelines.common.beam.options.PipelinesOptionsFactory;
 import org.gbif.pipelines.common.beam.utils.PathBuilder;
+import org.gbif.pipelines.core.factory.SerDeFactory;
 import org.gbif.pipelines.core.io.SyncDataFileWriter;
 import org.gbif.pipelines.estools.service.EsService;
 import org.gbif.pipelines.ingest.pipelines.utils.EsServer;
 import org.gbif.pipelines.ingest.pipelines.utils.InterpretedAvroWriter;
-import org.gbif.pipelines.ingest.utils.SerDeSerUtils;
 import org.gbif.pipelines.io.avro.AudubonRecord;
 import org.gbif.pipelines.io.avro.BasicRecord;
 import org.gbif.pipelines.io.avro.ClusteringRecord;
@@ -51,6 +51,7 @@ import org.gbif.pipelines.io.avro.Rank;
 import org.gbif.pipelines.io.avro.RankedName;
 import org.gbif.pipelines.io.avro.TaxonRecord;
 import org.gbif.pipelines.io.avro.TemporalRecord;
+import org.gbif.pipelines.io.avro.VocabularyConcept;
 import org.gbif.pipelines.io.avro.grscicoll.GrscicollRecord;
 import org.gbif.pipelines.io.avro.json.ParentJsonRecord;
 import org.gbif.pipelines.transforms.core.BasicTransform;
@@ -111,7 +112,7 @@ public class EventToEsIndexPipelineIT {
     return ExtendedRecord.newBuilder()
         .setId(id)
         .setCoreRowType(DwcTerm.Event.qualifiedName())
-        .setParentCoreId(parentId)
+        .setCoreId(parentId)
         .setCoreTerms(coreEvent1)
         .build();
   }
@@ -173,14 +174,21 @@ public class EventToEsIndexPipelineIT {
     try (SyncDataFileWriter<EventCoreRecord> writer =
         InterpretedAvroWriter.createAvroWriter(
             optionsWriter, EventCoreTransform.builder().create(), EVENT_TERM, postfix)) {
-      EventCoreRecord eventCoreRecord = EventCoreRecord.newBuilder().setId(ID).build();
+      EventCoreRecord eventCoreRecord =
+          EventCoreRecord.newBuilder().setId(ID).setLocationID("L0").build();
       writer.append(eventCoreRecord);
 
       EventCoreRecord subEventCoreRecord =
           EventCoreRecord.newBuilder()
               .setId(SUB_EVENT_ID)
+              .setEventType(
+                  VocabularyConcept.newBuilder()
+                      .setConcept("survey")
+                      .setLineage(Collections.emptyList())
+                      .build())
               .setParentEventID(ID)
               .setParentsLineage(Collections.singletonList(Parent.newBuilder().setId(ID).build()))
+              .setLocationID("L1")
               .build();
       writer.append(subEventCoreRecord);
 
@@ -191,7 +199,7 @@ public class EventToEsIndexPipelineIT {
               .setParentsLineage(
                   Arrays.asList(
                       Parent.newBuilder().setId(ID).build(),
-                      Parent.newBuilder().setId(SUB_EVENT_ID).build()))
+                      Parent.newBuilder().setId(SUB_EVENT_ID).setEventType("survey").build()))
               .build();
       writer.append(subEventCoreRecord2);
     }
@@ -215,6 +223,8 @@ public class EventToEsIndexPipelineIT {
               .setParentId(ID)
               .setEventDate(
                   EventDate.newBuilder().setGte("2017-10-10").setLte("2020-10-10").build())
+              .setMonth(10)
+              .setYear(2017)
               .build();
       writer.append(temporalRecordSubEvent);
 
@@ -240,17 +250,12 @@ public class EventToEsIndexPipelineIT {
               .setDecimalLatitude(10d)
               .setDecimalLongitude(5d)
               .setHasCoordinate(Boolean.TRUE)
+              .setCountryCode("DK")
               .build();
       writer.append(locationRecordSubEvent);
 
       LocationRecord locationRecordSubEvent2 =
-          LocationRecord.newBuilder()
-              .setId(SUB_EVENT_ID_2)
-              .setParentId(SUB_EVENT_ID)
-              .setDecimalLatitude(5d)
-              .setDecimalLongitude(15d)
-              .setHasCoordinate(Boolean.TRUE)
-              .build();
+          LocationRecord.newBuilder().setId(SUB_EVENT_ID_2).setParentId(SUB_EVENT_ID).build();
       writer.append(locationRecordSubEvent2);
     }
     try (SyncDataFileWriter<TaxonRecord> writer =
@@ -343,15 +348,11 @@ public class EventToEsIndexPipelineIT {
       ext.put(Extension.MEASUREMENT_OR_FACT.getRowType(), Collections.singletonList(ext1));
 
       ExtendedRecord extendedRecord =
-          ExtendedRecord.newBuilder().setId(ID).setParentCoreId(ID).setExtensions(ext).build();
+          ExtendedRecord.newBuilder().setId(ID).setCoreId(ID).setExtensions(ext).build();
       writer.append(extendedRecord);
 
       ExtendedRecord subEventExtendedRecord =
-          ExtendedRecord.newBuilder()
-              .setId(SUB_EVENT_ID)
-              .setParentCoreId(ID)
-              .setExtensions(ext)
-              .build();
+          ExtendedRecord.newBuilder().setId(SUB_EVENT_ID).setCoreId(ID).setExtensions(ext).build();
       writer.append(subEventExtendedRecord);
     }
 
@@ -437,7 +438,7 @@ public class EventToEsIndexPipelineIT {
     String[] args = {
       "--datasetId=" + datasetKey,
       "--attempt=1",
-      "--runner=TestSparkRunner",
+      "--runner=SparkRunner",
       "--metaFileName=occurrence-to-index.yml",
       "--inputPath=" + input,
       "--targetPath=" + input,
@@ -461,6 +462,15 @@ public class EventToEsIndexPipelineIT {
 
     ParentJsonRecord eventRecord = getResult(idxName, ID, "event");
     assertRootParenJsonRecordResponse(eventRecord);
+
+    ParentJsonRecord eventRecordSub2 = getResult(idxName, SUB_EVENT_ID_2, "event");
+    assertEquals("DK", eventRecordSub2.getLocationInherited().getCountryCode());
+    assertEquals(SUB_EVENT_ID_2, eventRecordSub2.getTemporalInherited().getId());
+    assertEquals(new Integer(10), eventRecordSub2.getTemporalInherited().getMonth());
+    assertEquals(new Integer(2017), eventRecordSub2.getTemporalInherited().getYear());
+    assertEquals(
+        Collections.singletonList("survey"), eventRecordSub2.getEventInherited().getEventType());
+    assertEquals("L1", eventRecordSub2.getEventInherited().getLocationID());
   }
 
   /**
@@ -494,7 +504,7 @@ public class EventToEsIndexPipelineIT {
                 + "    }\n"
                 + "  }\n"
                 + "}");
-    ObjectMapper mapper = SerDeSerUtils.objectMapper();
+    ObjectMapper mapper = SerDeFactory.avroMapperNonNulls();
     ArrayNode results =
         (ArrayNode)
             mapper
@@ -508,14 +518,16 @@ public class EventToEsIndexPipelineIT {
 
   /** Asserts the Parent Event Record by checking the expected nested data. */
   private void assertRootParenJsonRecordResponse(ParentJsonRecord record) {
+    Assert.assertNotNull(record.getInternalId());
+
     // Assert temporal coverage
     Assert.assertNotNull(record.getDerivedMetadata().getTemporalCoverage());
-    Assert.assertEquals(record.getDerivedMetadata().getTemporalCoverage().getGte(), "2017-10-10");
-    Assert.assertEquals(record.getDerivedMetadata().getTemporalCoverage().getLte(), "2021-10-10");
+    Assert.assertEquals("2017-10-10", record.getDerivedMetadata().getTemporalCoverage().getGte());
+    Assert.assertEquals("2021-10-10", record.getDerivedMetadata().getTemporalCoverage().getLte());
 
     // Assert geographic coverage/convex hull
     Assert.assertNotNull(record.getDerivedMetadata().getWktConvexHull());
-    Assert.assertEquals(record.getDerivedMetadata().getWktConvexHull(), "LINESTRING (5 10, 15 5)");
+    Assert.assertEquals("POINT (5 10)", record.getDerivedMetadata().getWktConvexHull());
 
     // Assert taxonomic coverage
     Assert.assertNotNull(record.getDerivedMetadata().getTaxonomicCoverage());

@@ -506,10 +506,10 @@
   <field name="matched_name"           type="string"  multiValued="true" indexed="true" stored="false" />
   <field name="text_recordedBy"        type="textgen" multiValued="true" indexed="true" stored="false" />
   <field name="text_identifiedBy"      type="textgen" multiValued="true" indexed="true" stored="false" />
-  <field name="text_datasetName"       type="textgen" multiValued="true" indexed="true" stored="false"/>
-  <field name="text_eventID"           type="textgen" indexed="true" stored="false"/>
-  <field name="text_parentEventID"     type="textgen" indexed="true" stored="false"/>
-  <field name="text_fieldNumber"       type="textgen" indexed="true" stored="false"/>
+  <field name="text_datasetName" type="textgen" multiValued="true" indexed="true" stored="false"/>
+  <field name="text_eventID" type="textgen"  indexed="true" stored="false"/>
+  <field name="text_parentEventID" type="textgen" indexed="true" stored="false"/>
+  <field name="text_fieldNumber" type="textgen" indexed="true" stored="false"/>
 
   <!-- occurrenceDetails needs to be remapped on export -->
   <!-- see https://github.com/AtlasOfLivingAustralia/la-pipelines/issues/236 -->

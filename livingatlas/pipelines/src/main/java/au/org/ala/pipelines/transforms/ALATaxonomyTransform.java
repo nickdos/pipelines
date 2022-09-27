@@ -2,6 +2,7 @@ package au.org.ala.pipelines.transforms;
 
 import static au.org.ala.pipelines.common.ALARecordTypes.ALA_TAXONOMY;
 
+import au.org.ala.kvs.ALANameMatchConfig;
 import au.org.ala.kvs.client.ALACollectoryMetadata;
 import au.org.ala.names.ws.api.NameSearch;
 import au.org.ala.names.ws.api.NameUsageMatch;
@@ -46,6 +47,7 @@ public class ALATaxonomyTransform extends Transform<ExtendedRecord, ALATaxonReco
   private KeyValueStore<String, ALACollectoryMetadata> dataResourceStore;
   private final SerializableSupplier<KeyValueStore<String, ALACollectoryMetadata>>
       dataResourceStoreSupplier;
+  private final ALANameMatchConfig alaNameMatchConfig;
 
   @Builder(buildMethodName = "create")
   private ALATaxonomyTransform(
@@ -55,8 +57,8 @@ public class ALATaxonomyTransform extends Transform<ExtendedRecord, ALATaxonReco
       KeyValueStore<String, Boolean> kingdomCheckStore,
       SerializableSupplier<KeyValueStore<String, Boolean>> kingdomCheckStoreSupplier,
       KeyValueStore<String, ALACollectoryMetadata> dataResourceStore,
-      SerializableSupplier<KeyValueStore<String, ALACollectoryMetadata>>
-          dataResourceStoreSupplier) {
+      SerializableSupplier<KeyValueStore<String, ALACollectoryMetadata>> dataResourceStoreSupplier,
+      ALANameMatchConfig alaNameMatchConfig) {
     super(
         ALATaxonRecord.class,
         ALA_TAXONOMY,
@@ -69,22 +71,13 @@ public class ALATaxonomyTransform extends Transform<ExtendedRecord, ALATaxonReco
     this.kingdomCheckStoreSupplier = kingdomCheckStoreSupplier;
     this.dataResourceStore = dataResourceStore;
     this.dataResourceStoreSupplier = dataResourceStoreSupplier;
+    this.alaNameMatchConfig = alaNameMatchConfig;
   }
 
-  /** Maps {@link TaxonRecord} to key value, where key is {@link TaxonRecord#getId} */
-  public MapElements<ALATaxonRecord, KV<String, ALATaxonRecord>> asKv(boolean useParent) {
+  /** Maps {@link ALATaxonRecord} to key value, where key is {@link TaxonRecord#getId} */
+  public MapElements<ALATaxonRecord, KV<String, ALATaxonRecord>> toCoreIdKv() {
     return MapElements.into(new TypeDescriptor<KV<String, ALATaxonRecord>>() {})
-        .via((ALATaxonRecord tr) -> KV.of(useParent ? tr.getId() : tr.getId(), tr));
-  }
-
-  /** Maps {@link TaxonRecord} to key value, where key is {@link TaxonRecord#getId} */
-  public MapElements<ALATaxonRecord, KV<String, ALATaxonRecord>> toKv() {
-    return asKv(false);
-  }
-
-  /** Maps {@link TaxonRecord} to key value, where key is {@link TaxonRecord#getParentId} */
-  public MapElements<ALATaxonRecord, KV<String, ALATaxonRecord>> toParentKv() {
-    return asKv(true);
+        .via((ALATaxonRecord tr) -> KV.of(tr.getId(), tr));
   }
 
   public ALATaxonomyTransform counterFn(SerializableConsumer<String> counterFn) {
@@ -154,13 +147,13 @@ public class ALATaxonomyTransform extends Transform<ExtendedRecord, ALATaxonReco
     BiConsumer<ExtendedRecord, ALATaxonRecord> sourceCheck =
         ALATaxonomyInterpreter.alaSourceQualityChecks(dataResource, kingdomCheckStore);
     BiConsumer<ExtendedRecord, ALATaxonRecord> interpret =
-        ALATaxonomyInterpreter.alaTaxonomyInterpreter(dataResource, nameMatchStore);
+        ALATaxonomyInterpreter.alaTaxonomyInterpreter(
+            dataResource, nameMatchStore, alaNameMatchConfig.getMatchOnTaxonID());
     BiConsumer<ExtendedRecord, ALATaxonRecord> resultCheck =
         ALATaxonomyInterpreter.alaResultQualityChecks(dataResource);
     Interpretation.from(source)
         .to(tr)
         .when(er -> !er.getCoreTerms().isEmpty())
-        .via(ALATaxonomyInterpreter::setParentId)
         .via(sourceCheck.andThen(interpret).andThen(resultCheck));
 
     // the id is null when there is an error in the interpretation. In these

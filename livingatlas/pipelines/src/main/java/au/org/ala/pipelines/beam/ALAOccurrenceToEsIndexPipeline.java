@@ -17,12 +17,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.extensions.joinlibrary.Join;
-import org.apache.beam.sdk.io.AvroIO;
 import org.apache.beam.sdk.io.elasticsearch.ElasticsearchIO;
-import org.apache.beam.sdk.io.fs.EmptyMatchTreatment;
 import org.apache.beam.sdk.transforms.Filter;
 import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.transforms.ParDo.SingleOutput;
+import org.apache.beam.sdk.transforms.Values;
 import org.apache.beam.sdk.transforms.View;
 import org.apache.beam.sdk.transforms.join.CoGbkResult;
 import org.apache.beam.sdk.transforms.join.CoGroupByKey;
@@ -38,6 +37,9 @@ import org.gbif.pipelines.core.pojo.HdfsConfigs;
 import org.gbif.pipelines.core.utils.FsUtils;
 import org.gbif.pipelines.io.avro.*;
 import org.gbif.pipelines.io.avro.grscicoll.GrscicollRecord;
+import org.gbif.pipelines.io.avro.json.EventInheritedRecord;
+import org.gbif.pipelines.io.avro.json.LocationInheritedRecord;
+import org.gbif.pipelines.io.avro.json.TemporalInheritedRecord;
 import org.gbif.pipelines.transforms.core.*;
 import org.gbif.pipelines.transforms.extension.MeasurementOrFactTransform;
 import org.gbif.pipelines.transforms.extension.MultimediaTransform;
@@ -118,6 +120,9 @@ public class ALAOccurrenceToEsIndexPipeline {
         t ->
             PathBuilder.buildPathInterpretUsingTargetPath(options, DwcTerm.Occurrence, t, ALL_AVRO);
 
+    UnaryOperator<String> eventsPathFn =
+        t -> PathBuilder.buildPathInterpretUsingTargetPath(options, DwcTerm.Event, t, ALL_AVRO);
+
     UnaryOperator<String> identifiersPathFn =
         t -> ALAFsUtils.buildPathIdentifiersUsingTargetPath(options, t, ALL_AVRO);
 
@@ -139,8 +144,8 @@ public class ALAOccurrenceToEsIndexPipeline {
         IndexingTransform.builder()
             .pipeline(p)
             .pathFn(pathFn)
+            .eventsPathFn(eventsPathFn)
             .identifiersPathFn(identifiersPathFn)
-            .denormEventsPath(denormPath)
             .asParentChildRecord(false)
             .build()
             .apply();
@@ -188,11 +193,12 @@ public class ALAOccurrenceToEsIndexPipeline {
 
     private final UnaryOperator<String> identifiersPathFn;
 
-    private final String denormEventsPath;
+    private final UnaryOperator<String> eventsPathFn;
 
     private final boolean asParentChildRecord;
 
     // Init transforms
+    private final EventCoreTransform eventCoreTransform = EventCoreTransform.builder().create();
     private final ALAUUIDTransform uuidTransform = ALAUUIDTransform.create();
     private final BasicTransform basicTransform = BasicTransform.builder().create();
     private final ALAMetadataTransform metadataTransform = ALAMetadataTransform.builder().create();
@@ -239,7 +245,7 @@ public class ALAOccurrenceToEsIndexPipeline {
       PCollection<KV<String, ALATaxonRecord>> taxonCollection =
           pipeline
               .apply("Read occurrence Taxon", taxonomyTransform.read(pathFn))
-              .apply("Map occurrence Taxon to KV", taxonomyTransform.toKv());
+              .apply("Map occurrence Taxon to KV", taxonomyTransform.toCoreIdKv());
 
       PCollection<KV<String, MultimediaRecord>> multimediaCollection =
           pipeline
@@ -251,8 +257,33 @@ public class ALAOccurrenceToEsIndexPipeline {
               .apply("Read occurrence Multimedia", measurementOrFactTransform.read(pathFn))
               .apply("Map occurrence Multimedia to KV", measurementOrFactTransform.toKv());
 
-      PCollection<KV<String, DenormalisedEvent>> denormalisedEvent =
-          getEventDenormalisation(verbatimCollection, denormEventsPath, pipeline);
+      PCollection<KV<String, String>> occMapping = getEventIDToOccurrenceID(verbatimCollection);
+
+      PCollection<KV<String, EventCoreRecord>> eventCoreCollection =
+                  pipeline
+                      .apply("Read occurrence Temporal", eventCoreTransform.read(eventsPathFn))
+                      .apply("Map occurrence Temporal to KV", eventCoreTransform.toKv());
+
+      PCollection<KV<String, TemporalRecord>> eventTemporalCollection =
+                  pipeline
+                      .apply("Read occurrence Temporal", temporalTransform.read(eventsPathFn))
+                      .apply("Map occurrence Temporal to KV", temporalTransform.toKv());
+
+      PCollection<KV<String, LocationRecord>> eventLocationCollection =
+                  pipeline
+                      .apply("Read occurrence Location", locationTransform.read(eventsPathFn))
+                      .apply("Map occurrence Location to KV", locationTransform.toKv());
+
+      InheritedFields inheritedFields =
+          InheritedFields.builder()
+              .inheritedFieldsTransform(InheritedFieldsTransform.builder().build())
+              .locationCollection(eventLocationCollection)
+              .temporalCollection(eventTemporalCollection)
+              .eventCoreCollection(eventCoreCollection)
+              .locationTransform(locationTransform)
+              .temporalTransform(temporalTransform)
+              .eventCoreTransform(eventCoreTransform)
+              .build();
 
       log.info("Adding step: Converting into a occurrence json object");
       SingleOutput<KV<String, CoGbkResult>, String> occurrenceJsonDoFn =
@@ -265,11 +296,26 @@ public class ALAOccurrenceToEsIndexPipeline {
               .taxonRecordTag(taxonomyTransform.getTag())
               .multimediaRecordTag(multimediaTransform.getTag())
               .measurementOrFactRecordTupleTag(measurementOrFactTransform.getTag())
-              .denormalisedEventTag(DENORM_TAG)
+              .locationInheritedRecordTag(InheritedFieldsTransform.LIR_TAG)
+              .temporalInheritedRecordTag(InheritedFieldsTransform.TIR_TAG)
+              .eventInheritedRecordTag(InheritedFieldsTransform.EIR_TAG)
+              .eventCoreRecordTag(eventCoreTransform.getTag())
               .metadataView(metadataView)
               .asParentChildRecord(asParentChildRecord)
               .build()
               .converter();
+
+      PCollection<KV<String, EventCoreRecord>> eventCoreRecords =
+              Join.innerJoin(occMapping, eventCoreCollection).apply(Values.create());
+
+      PCollection<KV<String, LocationInheritedRecord>> locationInheritedRecords =
+              Join.innerJoin(occMapping,inheritedFields.inheritLocationFields()).apply(Values.create());
+
+      PCollection<KV<String, TemporalInheritedRecord>> temporalInheritedRecords =
+              Join.innerJoin(occMapping,inheritedFields.inheritTemporalFields()).apply(Values.create());
+
+      PCollection<KV<String, EventInheritedRecord>> eventInheritedRecords =
+              Join.innerJoin(occMapping,inheritedFields.inheritEventFields()).apply(Values.create());
 
       return KeyedPCollectionTuple
           // Core
@@ -283,18 +329,20 @@ public class ALAOccurrenceToEsIndexPipeline {
           // Raw
           .and(verbatimTransform.getTag(), verbatimCollection)
           .and(measurementOrFactTransform.getTag(), measurementOrFactCollection)
-          .and(DENORM_TAG, denormalisedEvent)
+          .and(eventCoreTransform.getTag(), eventCoreRecords)
+          //          // Inherited
+          .and(InheritedFieldsTransform.LIR_TAG, locationInheritedRecords)
+          .and(InheritedFieldsTransform.TIR_TAG, temporalInheritedRecords)
+          .and(InheritedFieldsTransform.EIR_TAG, eventInheritedRecords)
           // Apply
           .apply("Grouping occurrence objects", CoGroupByKey.create())
           .apply("Merging to occurrence json", occurrenceJsonDoFn);
     }
   }
 
-  /** Load denormalisation records, keyed on occurrenceID */
-  public static PCollection<KV<String, DenormalisedEvent>> getEventDenormalisation(
-      PCollection<KV<String, ExtendedRecord>> verbatimCollection,
-      String denormEventsPath,
-      Pipeline p) {
+  /** Load eventID -> occurrenceID map */
+  public static PCollection<KV<String, String>> getEventIDToOccurrenceID(
+      PCollection<KV<String, ExtendedRecord>> verbatimCollection) {
 
     // eventID -> occurrenceCore.id map
     PCollection<KV<String, String>> eventIDToOccurrenceID =
@@ -311,22 +359,6 @@ public class ALAOccurrenceToEsIndexPipeline {
                                 kv.getValue().getCoreTerms().get(DwcTerm.eventID.qualifiedName()),
                                 kv.getKey())));
 
-    // eventID -> DenormalisedEvent map
-    PCollection<KV<String, DenormalisedEvent>> denorm =
-        p.apply(
-                AvroIO.read(DenormalisedEvent.class)
-                    .withEmptyMatchTreatment(EmptyMatchTreatment.ALLOW)
-                    .from(denormEventsPath))
-            .apply(
-                MapElements.into(new TypeDescriptor<KV<String, DenormalisedEvent>>() {})
-                    .via((DenormalisedEvent tr) -> KV.of(tr.getId(), tr)));
-
-    // join
-    PCollection<KV<String, KV<String, DenormalisedEvent>>> join =
-        Join.innerJoin(eventIDToOccurrenceID, denorm);
-
-    return join.apply(
-        MapElements.into(new TypeDescriptor<KV<String, DenormalisedEvent>>() {})
-            .via(joined -> KV.of(joined.getValue().getKey(), joined.getValue().getValue())));
+    return eventIDToOccurrenceID;
   }
 }

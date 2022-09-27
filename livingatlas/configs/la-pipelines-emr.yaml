@@ -42,6 +42,7 @@ interpret:
   appName: Interpretation for {datasetId}
   inputPath: hdfs:///pipelines-data/{datasetId}/1/verbatim.avro
   targetPath: hdfs:///pipelines-data/
+  defaultDateFormat: DMYT,DMY
 
 uuid:
   inputPath: hdfs:///pipelines-data
@@ -129,6 +130,7 @@ alaNameMatch:
   retryConfig:
     maxAttempts: 5
     initialIntervalMillis: 5000
+
 
 ### la-pipelines cli additional arguments, like JVM or spark command line arguments
 interpret-sh-args:

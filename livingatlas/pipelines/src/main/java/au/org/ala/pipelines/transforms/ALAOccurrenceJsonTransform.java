@@ -17,6 +17,9 @@ import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
 import org.gbif.pipelines.io.avro.*;
+import org.gbif.pipelines.io.avro.json.EventInheritedRecord;
+import org.gbif.pipelines.io.avro.json.LocationInheritedRecord;
+import org.gbif.pipelines.io.avro.json.TemporalInheritedRecord;
 
 /**
  * Beam level transformation for the ES output json. The transformation consumes objects, which
@@ -85,10 +88,13 @@ public class ALAOccurrenceJsonTransform implements Serializable {
   @NonNull private final TupleTag<LocationRecord> locationRecordTag;
   @NonNull private final TupleTag<ALATaxonRecord> taxonRecordTag;
   @NonNull private final TupleTag<MultimediaRecord> multimediaRecordTag;
+  @NonNull private final TupleTag<EventCoreRecord> eventCoreRecordTag;
   @NonNull private final PCollectionView<ALAMetadataRecord> metadataView;
-  @NonNull private final TupleTag<DenormalisedEvent> denormalisedEventTag;
-
   @NonNull private final TupleTag<MeasurementOrFactRecord> measurementOrFactRecordTupleTag;
+
+  @NonNull private final TupleTag<LocationInheritedRecord> locationInheritedRecordTag;
+  @NonNull private final TupleTag<TemporalInheritedRecord> temporalInheritedRecordTag;
+  @NonNull private final TupleTag<EventInheritedRecord> eventInheritedRecordTag;
 
   // Determines if the output record is a parent-child record
   @Builder.Default private final boolean asParentChildRecord = false;
@@ -120,12 +126,25 @@ public class ALAOccurrenceJsonTransform implements Serializable {
                 v.getOnly(locationRecordTag, LocationRecord.newBuilder().setId(k).build());
             ALATaxonRecord txr =
                 v.getOnly(taxonRecordTag, ALATaxonRecord.newBuilder().setId(k).build());
-            DenormalisedEvent de =
-                v.getOnly(denormalisedEventTag, DenormalisedEvent.newBuilder().setId(k).build());
             MeasurementOrFactRecord mfr =
                 v.getOnly(
                     measurementOrFactRecordTupleTag,
                     MeasurementOrFactRecord.newBuilder().setId(k).build());
+            EventCoreRecord ecr =
+                    v.getOnly(eventCoreRecordTag, EventCoreRecord.newBuilder().setId(k).build());
+
+            // Inherited
+            EventInheritedRecord eir =
+                    v.getOnly(
+                            eventInheritedRecordTag, EventInheritedRecord.newBuilder().setId(k).build());
+            LocationInheritedRecord lir =
+                    v.getOnly(
+                            locationInheritedRecordTag,
+                            LocationInheritedRecord.newBuilder().setId(k).build());
+            TemporalInheritedRecord tir =
+                    v.getOnly(
+                            temporalInheritedRecordTag,
+                            TemporalInheritedRecord.newBuilder().setId(k).build());
 
             ALAOccurrenceJsonConverter occurrenceJsonConverter =
                 ALAOccurrenceJsonConverter.builder()
@@ -135,15 +154,19 @@ public class ALAOccurrenceJsonTransform implements Serializable {
                     .temporal(tr)
                     .location(lr)
                     .taxon(txr)
-                    .denormalisedEvent(de)
                     .verbatim(er)
                     .measurementOrFact(mfr)
+                    .eventCore(ecr)
+                    .eventInheritedRecord(eir)
+                    .locationInheritedRecord(lir)
+                    .temporalInheritedRecord(tir)
                     .build();
             if (asParentChildRecord) {
               c.output(
                   ALAParentJsonConverter.builder()
-                      .metadata(mdr)
                       .occurrenceJsonRecord(occurrenceJsonConverter.convert())
+                      .metadata(mdr)
+                      .verbatim(er)
                       .build()
                       .toJson());
             } else {

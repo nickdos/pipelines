@@ -4,7 +4,7 @@
   "namespace" : "org.gbif.pipelines.io.avro",
   "fields" : [ {
     "name" : "gbifid",
-    "type" : "long"
+    "type" : "string"
   }, {
     "name" : "v_abstract",
     "type" : [ "string", "null" ]
@@ -1070,9 +1070,9 @@
   }, {
     "name" : "preparations",
     "type" : [ {
-      "type" : "array",
-      "items" : [ "string", "null" ]
-    }, "null" ]
+       "type" : "array",
+       "items" : [ "string", "null" ]
+     }, "null" ]
   }, {
     "name" : "disposition",
     "type" : [ "string", "null" ]
@@ -1090,10 +1090,10 @@
     "type" : [ "string", "null" ]
   }, {
     "name" : "othercatalognumbers",
-    "type" : [ {
-      "type" : "array",
-      "items" : [ "string", "null" ]
-    }, "null" ]
+     "type" : [ {
+       "type" : "array",
+       "items" : [ "string", "null" ]
+     }, "null" ]
   }, {
     "name" : "occurrenceremarks",
     "type" : [ "string", "null" ]
@@ -1157,9 +1157,9 @@
   }, {
     "name" : "samplingprotocol",
     "type" : [ {
-      "type" : "array",
-      "items" : [ "string", "null" ]
-    }, "null" ]
+       "type" : "array",
+       "items" : [ "string", "null" ]
+     }, "null" ]
   }, {
     "name" : "samplesizevalue",
     "type" : [ "double", "null" ]

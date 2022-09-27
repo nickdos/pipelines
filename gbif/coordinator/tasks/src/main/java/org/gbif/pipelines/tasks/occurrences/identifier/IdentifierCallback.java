@@ -1,6 +1,7 @@
 package org.gbif.pipelines.tasks.occurrences.identifier;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.AllArgsConstructor;
@@ -54,9 +55,17 @@ public class IdentifierCallback extends AbstractMessageCallback<PipelinesVerbati
   }
 
   @Override
+  public String getRouting() {
+    return new PipelinesVerbatimMessage()
+            .setPipelineSteps(Collections.singleton(StepType.VERBATIM_TO_IDENTIFIER.name()))
+            .getRoutingKey()
+        + ".*";
+  }
+
+  @Override
   public boolean isMessageCorrect(PipelinesVerbatimMessage message) {
     if (!message.getPipelineSteps().contains(TYPE.name())) {
-      log.error("The message doesn't contain VERBATIM_TO_IDENTIFIER type");
+      log.error("The message doesn't contain {} type", TYPE);
       return false;
     }
     return true;

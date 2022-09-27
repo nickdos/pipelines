@@ -209,16 +209,28 @@ public class HdfsViewPipeline {
             .apply("Map GBIF ids to KV", idTransform.toKv());
 
     PCollection<KV<String, ClusteringRecord>> clusteringCollection =
-        p.apply("Read clustering", clusteringTransform.read(interpretPathFn))
-            .apply("Map clustering to KV", clusteringTransform.toKv());
+        coreTerm == DwcTerm.Event
+            ? p.apply(
+                "Empty event records",
+                Create.empty(
+                    TypeDescriptors.kvs(
+                        TypeDescriptors.strings(), clusteringTransform.getOutputTypeDescriptor())))
+            : p.apply("Read clustering", clusteringTransform.read(interpretPathFn))
+                .apply("Map clustering to KV", clusteringTransform.toKv());
 
     PCollection<KV<String, ExtendedRecord>> verbatimCollection =
         p.apply("Read Verbatim", verbatimTransform.read(interpretPathFn))
             .apply("Map Verbatim to KV", verbatimTransform.toKv());
 
     PCollection<KV<String, BasicRecord>> basicCollection =
-        p.apply("Read Basic", basicTransform.read(interpretPathFn))
-            .apply("Map Basic to KV", basicTransform.toKv());
+        coreTerm == DwcTerm.Event
+            ? p.apply(
+                "Empty basic records",
+                Create.empty(
+                    TypeDescriptors.kvs(
+                        TypeDescriptors.strings(), basicTransform.getOutputTypeDescriptor())))
+            : p.apply("Read Basic", basicTransform.read(interpretPathFn))
+                .apply("Map Basic to KV", basicTransform.toKv());
 
     PCollection<KV<String, TemporalRecord>> temporalCollection =
         p.apply("Read Temporal", temporalTransform.read(interpretPathFn))
@@ -233,8 +245,14 @@ public class HdfsViewPipeline {
             .apply("Map Taxon to KV", taxonomyTransform.toKv());
 
     PCollection<KV<String, GrscicollRecord>> grscicollCollection =
-        p.apply("Read Grscicoll", grscicollTransform.read(interpretPathFn))
-            .apply("Map Grscicoll to KV", grscicollTransform.toKv());
+        coreTerm == DwcTerm.Event
+            ? p.apply(
+                "Empty Grscicoll records",
+                Create.empty(
+                    TypeDescriptors.kvs(
+                        TypeDescriptors.strings(), grscicollTransform.getOutputTypeDescriptor())))
+            : p.apply("Read Grscicoll", grscicollTransform.read(interpretPathFn))
+                .apply("Map Grscicoll to KV", grscicollTransform.toKv());
 
     PCollection<KV<String, MultimediaRecord>> multimediaCollection =
         p.apply("Read Multimedia", multimediaTransform.read(interpretPathFn))
@@ -490,6 +508,10 @@ public class HdfsViewPipeline {
     }
 
     log.info("Save metrics into the file and set files owner");
+    // Delete root directory of table records
+    FsUtils.deleteIfExist(
+        hdfsConfigs, PathBuilder.buildFilePathViewUsingInputPath(options, recordType));
+
     MetricsHandler.saveCountersToInputPathFile(options, result.metrics());
     String metadataPath =
         PathBuilder.buildDatasetAttemptPath(options, options.getMetaFileName(), true);

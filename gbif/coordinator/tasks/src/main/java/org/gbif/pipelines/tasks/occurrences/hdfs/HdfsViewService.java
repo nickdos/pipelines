@@ -1,4 +1,4 @@
-package org.gbif.pipelines.common.hdfs;
+package org.gbif.pipelines.tasks.occurrences.hdfs;
 
 import com.google.common.util.concurrent.AbstractIdleService;
 import java.util.concurrent.ExecutorService;
@@ -8,34 +8,32 @@ import org.apache.curator.framework.CuratorFramework;
 import org.gbif.common.messaging.DefaultMessagePublisher;
 import org.gbif.common.messaging.MessageListener;
 import org.gbif.common.messaging.api.MessagePublisher;
-import org.gbif.common.messaging.api.messages.PipelineBasedMessage;
-import org.gbif.common.messaging.api.messages.PipelinesInterpretationMessage;
 import org.gbif.pipelines.common.configs.StepConfiguration;
+import org.gbif.pipelines.common.hdfs.CommonHdfsViewCallback;
+import org.gbif.pipelines.common.hdfs.HdfsViewConfiguration;
 import org.gbif.pipelines.tasks.ServiceFactory;
 import org.gbif.registry.ws.client.pipelines.PipelinesHistoryClient;
 
-/** A service which listens to the {@link PipelinesInterpretationMessage } */
+/**
+ * A service which listens to the {@link
+ * org.gbif.common.messaging.api.messages.PipelinesInterpretedMessage }
+ */
 @Slf4j
-public class HdfsViewService<
-        I extends PipelinesInterpretationMessage, B extends PipelineBasedMessage>
-    extends AbstractIdleService {
+public class HdfsViewService extends AbstractIdleService {
 
-  private final org.gbif.pipelines.common.hdfs.HdfsViewConfiguration config;
-  private final HdfsCallbackFactory<I, B> callbackFactory;
+  private final HdfsViewConfiguration config;
   private MessageListener listener;
   private MessagePublisher publisher;
   private CuratorFramework curator;
   private ExecutorService executor;
 
-  public HdfsViewService(HdfsViewConfiguration config, HdfsCallbackFactory<I, B> callbackFactory) {
+  public HdfsViewService(HdfsViewConfiguration config) {
     this.config = config;
-    this.callbackFactory = callbackFactory;
   }
 
   @Override
   protected void startUp() throws Exception {
-    log.info(
-        "Started pipelines-{}-hdfs-view service with parameters : {}", config.stepType, config);
+    log.info("Started pipelines-hdfs-view service with parameters : {}", config);
     // Prefetch is one, since this is a long-running process.
     StepConfiguration c = config.stepConfig;
     listener = new MessageListener(c.messaging.getConnectionParameters(), 1);
@@ -49,10 +47,16 @@ public class HdfsViewService<
     PipelinesHistoryClient historyClient =
         ServiceFactory.createPipelinesHistoryClient(config.stepConfig);
 
-    HdfsViewCallback<I, B> callback =
-        callbackFactory.createCallBack(config, publisher, curator, historyClient, executor);
+    HdfsViewCallback callback =
+        HdfsViewCallback.builder()
+            .config(config)
+            .publisher(publisher)
+            .curator(curator)
+            .historyClient(historyClient)
+            .commonHdfsViewCallback(CommonHdfsViewCallback.create(config, executor))
+            .build();
 
-    listener.listen(c.queueName, callback.routingKey(), c.poolSize, callback);
+    listener.listen(c.queueName, callback.getRouting(), c.poolSize, callback);
   }
 
   @Override
@@ -61,6 +65,6 @@ public class HdfsViewService<
     publisher.close();
     curator.close();
     executor.shutdown();
-    log.info("Stopping pipelines-" + config.recordType.name().toLowerCase() + "-hdfs-view service");
+    log.info("Stopping pipelines-hdfs-view service");
   }
 }

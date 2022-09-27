@@ -305,7 +305,8 @@ public class BasicInterpreter {
     extractOptListValue(er, DwcTerm.preparations).ifPresent(br::setPreparations);
   }
 
-  public static void setParentId(ExtendedRecord er, BasicRecord br) {
-    Optional.ofNullable(er.getParentCoreId()).ifPresent(br::setParentId);
+  /** Sets the coreId field. */
+  public static void setCoreId(ExtendedRecord er, BasicRecord br) {
+    Optional.ofNullable(er.getCoreId()).ifPresent(br::setCoreId);
   }
 }

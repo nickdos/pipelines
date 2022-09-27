@@ -11,6 +11,7 @@ import java.io.IOException;
 import org.junit.Test;
 
 public class StateProvinceVocabTest {
+
   @Test
   public void testStateProvinceWithClasspathResource() throws IOException {
     ALAPipelinesConfig alaConfig = new ALAPipelinesConfig();
