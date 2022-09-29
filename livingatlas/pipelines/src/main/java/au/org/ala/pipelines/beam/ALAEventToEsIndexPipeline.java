@@ -140,7 +140,7 @@ public class ALAEventToEsIndexPipeline {
     Pipeline p = pipelinesFn.apply(options);
 
     log.info("Adding step 2: Creating transformations");
-    ALAMetadataTransform metadataTransform = ALAMetadataTransform.builder().create();
+    ALAMetadataTransform alaMetadataTransform = ALAMetadataTransform.builder().create();
     // Core
     EventCoreTransform eventCoreTransform = EventCoreTransform.builder().create();
     IdentifierTransform identifierTransform = IdentifierTransform.builder().create();
@@ -159,7 +159,7 @@ public class ALAEventToEsIndexPipeline {
 
     log.info("Adding step 3: Creating beam pipeline");
     PCollectionView<ALAMetadataRecord> metadataView =
-        p.apply("Read Metadata", metadataTransform.read(eventsPathFn))
+        p.apply("Read Metadata", alaMetadataTransform.read(eventsPathFn))
             .apply("Convert to view", View.asSingleton());
 
     PCollection<KV<String, ExtendedRecord>> verbatimCollection =
@@ -332,7 +332,7 @@ public class ALAEventToEsIndexPipeline {
     jsonCollection.apply("Push records to ES", writeIO);
 
     // run the AVRO builder
-    //    ALAEventToSearchAvroPipeline.run(options);
+    ALAEventToSearchAvroPipeline.run(options);
 
     log.info("Running the pipeline");
     try {

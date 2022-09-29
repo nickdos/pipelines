@@ -13,7 +13,6 @@ import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.dwc.terms.GbifTerm;
 import org.gbif.pipelines.core.converters.JsonConverter;
 import org.gbif.pipelines.io.avro.*;
-import org.gbif.pipelines.io.avro.Parent;
 import org.gbif.pipelines.io.avro.json.*;
 
 @Slf4j
@@ -105,45 +104,52 @@ public class ALAOccurrenceJsonConverter {
     }
 
     if (!hasCoordsInfo
-            && locationInheritedRecord.getDecimalLatitude() != null
-            && locationInheritedRecord.getDecimalLongitude() != null) {
+        && locationInheritedRecord.getDecimalLatitude() != null
+        && locationInheritedRecord.getDecimalLongitude() != null) {
       builder
-              .setHasCoordinate(true)
-              .setDecimalLatitude(locationInheritedRecord.getDecimalLatitude())
-              .setDecimalLongitude(locationInheritedRecord.getDecimalLongitude())
-              // geo_point
-              .setCoordinates(
-                      JsonConverter.convertCoordinates(
-                              locationInheritedRecord.getDecimalLongitude(),
-                              locationInheritedRecord.getDecimalLatitude()))
-              // geo_shape
-              .setScoordinates(
-                      JsonConverter.convertScoordinates(
-                              locationInheritedRecord.getDecimalLongitude(),
-                              locationInheritedRecord.getDecimalLatitude()));
+          .setHasCoordinate(true)
+          .setDecimalLatitude(locationInheritedRecord.getDecimalLatitude())
+          .setDecimalLongitude(locationInheritedRecord.getDecimalLongitude())
+          // geo_point
+          .setCoordinates(
+              JsonConverter.convertCoordinates(
+                  locationInheritedRecord.getDecimalLongitude(),
+                  locationInheritedRecord.getDecimalLatitude()))
+          // geo_shape
+          .setScoordinates(
+              JsonConverter.convertScoordinates(
+                  locationInheritedRecord.getDecimalLongitude(),
+                  locationInheritedRecord.getDecimalLatitude()));
     }
 
     if (!hasLocationID && eventInheritedRecord.getLocationID() != null) {
       builder.setLocationID(eventInheritedRecord.getLocationID());
     }
 
-    if (eventCore != null && eventCore.getParentsLineage() != null
-            && !eventCore.getParentsLineage().isEmpty()) {
+    if (eventCore != null
+        && eventCore.getParentsLineage() != null
+        && !eventCore.getParentsLineage().isEmpty()) {
 
-      List<String> eventIDs = eventCore.getParentsLineage().stream()
-              .sorted(Comparator.comparingInt(org.gbif.pipelines.io.avro.Parent::getOrder).reversed())
-              .map(e -> e.getId()).collect(Collectors.toList());
+      List<String> eventIDs =
+          eventCore.getParentsLineage().stream()
+              .sorted(
+                  Comparator.comparingInt(org.gbif.pipelines.io.avro.Parent::getOrder).reversed())
+              .map(e -> e.getId())
+              .collect(Collectors.toList());
       eventIDs.add(eventCore.getId());
 
-      List<String> eventTypes = eventCore.getParentsLineage().stream()
-              .sorted(Comparator.comparingInt(org.gbif.pipelines.io.avro.Parent::getOrder).reversed())
-              .map(e -> e.getEventType()).collect(Collectors.toList());
+      List<String> eventTypes =
+          eventCore.getParentsLineage().stream()
+              .sorted(
+                  Comparator.comparingInt(org.gbif.pipelines.io.avro.Parent::getOrder).reversed())
+              .map(e -> e.getEventType())
+              .collect(Collectors.toList());
 
-      if (eventCore.getEventType() != null){
+      if (eventCore.getEventType() != null) {
         eventTypes.add(eventCore.getEventType().getConcept());
       } else {
         String rawEventType = verbatim.getCoreTerms().get(GbifTerm.eventType.qualifiedName());
-        if (rawEventType != null){
+        if (rawEventType != null) {
           eventTypes.add(rawEventType);
         }
       }

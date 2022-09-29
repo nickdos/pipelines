@@ -131,20 +131,20 @@ public class ALAOccurrenceJsonTransform implements Serializable {
                     measurementOrFactRecordTupleTag,
                     MeasurementOrFactRecord.newBuilder().setId(k).build());
             EventCoreRecord ecr =
-                    v.getOnly(eventCoreRecordTag, EventCoreRecord.newBuilder().setId(k).build());
+                v.getOnly(eventCoreRecordTag, EventCoreRecord.newBuilder().setId(k).build());
 
             // Inherited
             EventInheritedRecord eir =
-                    v.getOnly(
-                            eventInheritedRecordTag, EventInheritedRecord.newBuilder().setId(k).build());
+                v.getOnly(
+                    eventInheritedRecordTag, EventInheritedRecord.newBuilder().setId(k).build());
             LocationInheritedRecord lir =
-                    v.getOnly(
-                            locationInheritedRecordTag,
-                            LocationInheritedRecord.newBuilder().setId(k).build());
+                v.getOnly(
+                    locationInheritedRecordTag,
+                    LocationInheritedRecord.newBuilder().setId(k).build());
             TemporalInheritedRecord tir =
-                    v.getOnly(
-                            temporalInheritedRecordTag,
-                            TemporalInheritedRecord.newBuilder().setId(k).build());
+                v.getOnly(
+                    temporalInheritedRecordTag,
+                    TemporalInheritedRecord.newBuilder().setId(k).build());
 
             ALAOccurrenceJsonConverter occurrenceJsonConverter =
                 ALAOccurrenceJsonConverter.builder()

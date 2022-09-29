@@ -1,15 +1,13 @@
 package au.org.ala.pipelines.interpreters;
 
+import static org.gbif.pipelines.core.utils.ModelUtils.extractOptValue;
+
 import au.org.ala.kvs.client.ALACollectoryMetadata;
 import au.org.ala.names.ws.api.NameSearch;
 import au.org.ala.names.ws.api.NameUsageMatch;
 import au.org.ala.pipelines.vocabulary.ALAOccurrenceIssue;
 import com.google.common.base.Enums;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import lombok.AccessLevel;
@@ -21,11 +19,7 @@ import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.dwc.terms.Term;
 import org.gbif.kvs.KeyValueStore;
 import org.gbif.pipelines.core.utils.ModelUtils;
-import org.gbif.pipelines.io.avro.ALAMatchIssueType;
-import org.gbif.pipelines.io.avro.ALAMatchType;
-import org.gbif.pipelines.io.avro.ALATaxonRecord;
-import org.gbif.pipelines.io.avro.ExtendedRecord;
-import org.gbif.pipelines.io.avro.NameType;
+import org.gbif.pipelines.io.avro.*;
 
 /** Providing taxonomic matching functionality for occurrence records. */
 @Slf4j
@@ -279,7 +273,7 @@ public class ALATaxonomyInterpreter {
   /**
    * Extract a value from a record, with a potential default value
    *
-   * @param er The extened record
+   * @param er The extended record
    * @param term The term to look up
    * @param defaults Any defaults that apply to this value
    * @return The resulting value, or null for not found
@@ -290,5 +284,15 @@ public class ALATaxonomyInterpreter {
       value = defaults.get(term.simpleName());
     }
     return value;
+  }
+
+  /** Sets the coreId field. */
+  public static void setCoreId(ExtendedRecord er, ALATaxonRecord tr) {
+    Optional.ofNullable(er.getCoreId()).ifPresent(tr::setCoreId);
+  }
+
+  /** Sets the parentEventId field. */
+  public static void setParentEventId(ExtendedRecord er, ALATaxonRecord tr) {
+    extractOptValue(er, DwcTerm.parentEventID).ifPresent(tr::setParentId);
   }
 }

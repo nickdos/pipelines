@@ -260,19 +260,19 @@ public class ALAOccurrenceToEsIndexPipeline {
       PCollection<KV<String, String>> occMapping = getEventIDToOccurrenceID(verbatimCollection);
 
       PCollection<KV<String, EventCoreRecord>> eventCoreCollection =
-                  pipeline
-                      .apply("Read occurrence Temporal", eventCoreTransform.read(eventsPathFn))
-                      .apply("Map occurrence Temporal to KV", eventCoreTransform.toKv());
+          pipeline
+              .apply("Read occurrence Temporal", eventCoreTransform.read(eventsPathFn))
+              .apply("Map occurrence Temporal to KV", eventCoreTransform.toKv());
 
       PCollection<KV<String, TemporalRecord>> eventTemporalCollection =
-                  pipeline
-                      .apply("Read occurrence Temporal", temporalTransform.read(eventsPathFn))
-                      .apply("Map occurrence Temporal to KV", temporalTransform.toKv());
+          pipeline
+              .apply("Read occurrence Temporal", temporalTransform.read(eventsPathFn))
+              .apply("Map occurrence Temporal to KV", temporalTransform.toKv());
 
       PCollection<KV<String, LocationRecord>> eventLocationCollection =
-                  pipeline
-                      .apply("Read occurrence Location", locationTransform.read(eventsPathFn))
-                      .apply("Map occurrence Location to KV", locationTransform.toKv());
+          pipeline
+              .apply("Read occurrence Location", locationTransform.read(eventsPathFn))
+              .apply("Map occurrence Location to KV", locationTransform.toKv());
 
       InheritedFields inheritedFields =
           InheritedFields.builder()
@@ -306,16 +306,18 @@ public class ALAOccurrenceToEsIndexPipeline {
               .converter();
 
       PCollection<KV<String, EventCoreRecord>> eventCoreRecords =
-              Join.innerJoin(occMapping, eventCoreCollection).apply(Values.create());
+          Join.innerJoin(occMapping, eventCoreCollection).apply(Values.create());
 
       PCollection<KV<String, LocationInheritedRecord>> locationInheritedRecords =
-              Join.innerJoin(occMapping,inheritedFields.inheritLocationFields()).apply(Values.create());
+          Join.innerJoin(occMapping, inheritedFields.inheritLocationFields())
+              .apply(Values.create());
 
       PCollection<KV<String, TemporalInheritedRecord>> temporalInheritedRecords =
-              Join.innerJoin(occMapping,inheritedFields.inheritTemporalFields()).apply(Values.create());
+          Join.innerJoin(occMapping, inheritedFields.inheritTemporalFields())
+              .apply(Values.create());
 
       PCollection<KV<String, EventInheritedRecord>> eventInheritedRecords =
-              Join.innerJoin(occMapping,inheritedFields.inheritEventFields()).apply(Values.create());
+          Join.innerJoin(occMapping, inheritedFields.inheritEventFields()).apply(Values.create());
 
       return KeyedPCollectionTuple
           // Core

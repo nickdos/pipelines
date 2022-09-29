@@ -78,7 +78,7 @@ public class LocationInheritedFieldsFn
       LocationInheritedFields parent = recordsMap.get(parentId);
 
       // required for bad data - where parentEventID refers to event not in dataset
-      if (parent == null){
+      if (parent == null) {
         return assigned;
       }
 

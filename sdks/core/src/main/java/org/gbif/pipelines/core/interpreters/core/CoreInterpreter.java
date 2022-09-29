@@ -117,7 +117,7 @@ public class CoreInterpreter {
                 GbifTerm.eventType, parentValues.get(GbifTerm.eventType.name()), vocabularyService)
             .ifPresent(c -> parentBuilder.setEventType(c.getConcept()));
 
-        if (parentBuilder.getEventType() == null){
+        if (parentBuilder.getEventType() == null) {
           parentBuilder.setEventType(parentValues.get(GbifTerm.eventType.name()));
         }
 
