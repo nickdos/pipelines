@@ -17,7 +17,6 @@ public class StateProvinceVocabTest {
     ALAPipelinesConfig alaConfig = new ALAPipelinesConfig();
     LocationInfoConfig locationInfoConfig = new LocationInfoConfig();
     alaConfig.setLocationInfoConfig(locationInfoConfig);
-    locationInfoConfig.setStateProvinceNamesFile("/stateProvinces.tsv");
 
     assertEquals(
         "Australian Capital Territory",

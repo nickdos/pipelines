@@ -6,14 +6,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.gbif.api.vocabulary.Extension;
 import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.pipelines.common.beam.metrics.IngestMetrics;
 import org.gbif.pipelines.core.converters.MeasurementOrFactTableConverter;
 import org.gbif.pipelines.ingest.java.metrics.IngestMetricsBuilder;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
-import org.gbif.pipelines.io.avro.GbifIdRecord;
+import org.gbif.pipelines.io.avro.IdentifierRecord;
+import org.gbif.pipelines.io.avro.MetadataRecord;
 import org.gbif.pipelines.io.avro.extension.dwc.MeasurementOrFactTable;
 import org.junit.Assert;
 import org.junit.Test;
@@ -27,7 +27,9 @@ public class TableConverterTest {
 
     // State
     IngestMetrics metrics = IngestMetricsBuilder.createInterpretedToHdfsViewMetrics();
-    GbifIdRecord idRecord = GbifIdRecord.newBuilder().setId(ID).setGbifId(1L).build();
+    IdentifierRecord idRecord = IdentifierRecord.newBuilder().setId(ID).setInternalId("1").build();
+    MetadataRecord metadataRecord =
+        MetadataRecord.newBuilder().setId(ID).setDatasetKey("dataset_key").build();
 
     Map<String, String> ext1 = new HashMap<>();
     ext1.put(DwcTerm.measurementID.qualifiedName(), "Id1");
@@ -39,9 +41,10 @@ public class TableConverterTest {
         ExtendedRecord.newBuilder().setId(ID).setExtensions(ext).build();
 
     // When
-    Optional<MeasurementOrFactTable> measurementOrFactTable =
+    List<MeasurementOrFactTable> measurementOrFactTable =
         TableConverter.<MeasurementOrFactTable>builder()
             .metrics(metrics)
+            .metadataRecord(metadataRecord)
             .verbatimMap(Collections.singletonMap(ID, extendedRecord))
             .converterFn(MeasurementOrFactTableConverter::convert)
             .counterName(MEASUREMENT_OR_FACT_TABLE_RECORDS_COUNT)
@@ -51,8 +54,8 @@ public class TableConverterTest {
 
     // Should
     Assert.assertNotNull(measurementOrFactTable);
-    Assert.assertTrue(measurementOrFactTable.isPresent());
-    Assert.assertEquals("1", measurementOrFactTable.get().getGbifid());
+    Assert.assertFalse(measurementOrFactTable.isEmpty());
+    Assert.assertEquals("1", measurementOrFactTable.get(0).getGbifid());
 
     Map<String, Long> map = new HashMap<>();
     metrics

@@ -4,8 +4,8 @@ import static org.gbif.pipelines.common.PipelinesVariables.Metrics.AVRO_TO_HDFS_
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.gbif.pipelines.common.beam.metrics.IngestMetrics;
 import org.gbif.pipelines.ingest.java.metrics.IngestMetricsBuilder;
 import org.gbif.pipelines.io.avro.AudubonRecord;
@@ -13,7 +13,7 @@ import org.gbif.pipelines.io.avro.BasicRecord;
 import org.gbif.pipelines.io.avro.ClusteringRecord;
 import org.gbif.pipelines.io.avro.EventCoreRecord;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
-import org.gbif.pipelines.io.avro.GbifIdRecord;
+import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.ImageRecord;
 import org.gbif.pipelines.io.avro.LocationRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
@@ -34,7 +34,7 @@ public class OccurrenceHdfsRecordConverterTest {
 
     // State
     IngestMetrics metrics = IngestMetricsBuilder.createInterpretedToHdfsViewMetrics();
-    GbifIdRecord idRecord = GbifIdRecord.newBuilder().setId(ID).setGbifId(1L).build();
+    IdentifierRecord idRecord = IdentifierRecord.newBuilder().setId(ID).setInternalId(ID).build();
     BasicRecord basicRecord = BasicRecord.newBuilder().setId(ID).build();
     ClusteringRecord clusteringRecord = ClusteringRecord.newBuilder().setId(ID).build();
     MetadataRecord metadataRecord = MetadataRecord.newBuilder().setId(ID).build();
@@ -49,7 +49,7 @@ public class OccurrenceHdfsRecordConverterTest {
     EventCoreRecord eventCoreRecord = EventCoreRecord.newBuilder().setId(ID).build();
 
     // When
-    Optional<OccurrenceHdfsRecord> hdfsRecord =
+    List<OccurrenceHdfsRecord> hdfsRecord =
         OccurrenceHdfsRecordConverter.builder()
             .metrics(metrics)
             .metadata(metadataRecord)
@@ -70,8 +70,8 @@ public class OccurrenceHdfsRecordConverterTest {
 
     // Should
     Assert.assertNotNull(hdfsRecord);
-    Assert.assertTrue(hdfsRecord.isPresent());
-    Assert.assertEquals(ID, hdfsRecord.get().getGbifid());
+    Assert.assertFalse(hdfsRecord.isEmpty());
+    Assert.assertEquals(ID, hdfsRecord.get(0).getGbifid());
 
     Map<String, Long> map = new HashMap<>();
     metrics

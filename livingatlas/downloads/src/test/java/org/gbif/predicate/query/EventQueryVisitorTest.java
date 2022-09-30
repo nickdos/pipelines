@@ -16,7 +16,7 @@ public class EventQueryVisitorTest {
             + "\"predicates\":["
             + "{"
             + "\"type\":\"in\","
-            + "\"key\":\"STATE_PROVINCE\",\"values\":[\"new south wales\"],"
+            + "\"key\":\"stateProvince\",\"values\":[\"new south wales\"],"
             + "\"matchCase\":false"
             + "}"
             + "]"
@@ -33,7 +33,7 @@ public class EventQueryVisitorTest {
   public void testEventQueryFromJSON() throws Exception {
 
     String json =
-        "{\"type\": \"and\", \"predicates\": [{\"type\": \"in\", \"key\": \"STATE_PROVINCE\",\"values\": [\"Victoria\"]}]}";
+        "{\"type\": \"and\", \"predicates\": [{\"type\": \"in\", \"key\": \"stateProvince\",\"values\": [\"Victoria\"]}]}";
     ObjectMapper om = new ObjectMapper();
     om.addMixIn(SearchParameter.class, ALAEventSearchParameter.class);
     Predicate predicate = om.readValue(json, Predicate.class);

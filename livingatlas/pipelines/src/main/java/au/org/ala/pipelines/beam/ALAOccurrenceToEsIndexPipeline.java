@@ -114,7 +114,7 @@ public class ALAOccurrenceToEsIndexPipeline {
     String esDocumentId = options.getEsDocumentId();
 
     log.info("Adding step 1: Options");
-    UnaryOperator<String> pathFn =
+    UnaryOperator<String> occurrencesPathFn =
         t ->
             PathBuilder.buildPathInterpretUsingTargetPath(options, DwcTerm.Occurrence, t, ALL_AVRO);
 
@@ -141,7 +141,7 @@ public class ALAOccurrenceToEsIndexPipeline {
     PCollection<String> jsonCollection =
         IndexingTransform.builder()
             .pipeline(p)
-            .pathFn(pathFn)
+            .occurrencePathFn(occurrencesPathFn)
             .eventsPathFn(eventsPathFn)
             .identifiersPathFn(identifiersPathFn)
             .asParentChildRecord(false)
@@ -187,7 +187,7 @@ public class ALAOccurrenceToEsIndexPipeline {
   static class IndexingTransform {
 
     private final Pipeline pipeline;
-    private final UnaryOperator<String> pathFn;
+    private final UnaryOperator<String> occurrencePathFn;
 
     private final UnaryOperator<String> identifiersPathFn;
 
@@ -212,7 +212,7 @@ public class ALAOccurrenceToEsIndexPipeline {
 
       PCollectionView<ALAMetadataRecord> metadataView =
           pipeline
-              .apply("Read occurrence Metadata", metadataTransform.read(pathFn))
+              .apply("Read occurrence Metadata", metadataTransform.read(occurrencePathFn))
               .apply("Convert to occurrence view", View.asSingleton());
 
       PCollection<KV<String, ALAUUIDRecord>> uuidCollection =
@@ -222,37 +222,38 @@ public class ALAOccurrenceToEsIndexPipeline {
 
       PCollection<KV<String, ExtendedRecord>> verbatimCollection =
           pipeline
-              .apply("Read occurrence Verbatim", verbatimTransform.read(pathFn))
+              .apply("Read occurrence Verbatim", verbatimTransform.read(occurrencePathFn))
               .apply("Map occurrence Verbatim to KV", verbatimTransform.toKv());
 
       PCollection<KV<String, BasicRecord>> basicCollection =
           pipeline
-              .apply("Read occurrence Basic", basicTransform.read(pathFn))
+              .apply("Read occurrence Basic", basicTransform.read(occurrencePathFn))
               .apply("Map occurrence Basic to KV", basicTransform.toKv());
 
       PCollection<KV<String, TemporalRecord>> temporalCollection =
           pipeline
-              .apply("Read occurrence Temporal", temporalTransform.read(pathFn))
+              .apply("Read occurrence Temporal", temporalTransform.read(occurrencePathFn))
               .apply("Map occurrence Temporal to KV", temporalTransform.toKv());
 
       PCollection<KV<String, LocationRecord>> locationCollection =
           pipeline
-              .apply("Read occurrence Location", locationTransform.read(pathFn))
+              .apply("Read occurrence Location", locationTransform.read(occurrencePathFn))
               .apply("Map occurrence Location to KV", locationTransform.toKv());
 
       PCollection<KV<String, ALATaxonRecord>> taxonCollection =
           pipeline
-              .apply("Read occurrence Taxon", taxonomyTransform.read(pathFn))
+              .apply("Read occurrence Taxon", taxonomyTransform.read(occurrencePathFn))
               .apply("Map occurrence Taxon to KV", taxonomyTransform.toCoreIdKv());
 
       PCollection<KV<String, MultimediaRecord>> multimediaCollection =
           pipeline
-              .apply("Read occurrence Multimedia", multimediaTransform.read(pathFn))
+              .apply("Read occurrence Multimedia", multimediaTransform.read(occurrencePathFn))
               .apply("Map occurrence Multimedia to KV", multimediaTransform.toKv());
 
       PCollection<KV<String, MeasurementOrFactRecord>> measurementOrFactCollection =
           pipeline
-              .apply("Read occurrence Multimedia", measurementOrFactTransform.read(pathFn))
+              .apply(
+                  "Read occurrence Multimedia", measurementOrFactTransform.read(occurrencePathFn))
               .apply("Map occurrence Multimedia to KV", measurementOrFactTransform.toKv());
 
       PCollection<KV<String, String>> occMapping = getEventIDToOccurrenceID(verbatimCollection);

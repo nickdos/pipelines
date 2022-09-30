@@ -1,6 +1,7 @@
 package org.gbif.pipelines.transforms.table;
 
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,7 @@ import org.gbif.pipelines.io.avro.BasicRecord;
 import org.gbif.pipelines.io.avro.ClusteringRecord;
 import org.gbif.pipelines.io.avro.EventCoreRecord;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
-import org.gbif.pipelines.io.avro.GbifIdRecord;
+import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.ImageRecord;
 import org.gbif.pipelines.io.avro.LocationRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
@@ -74,8 +75,12 @@ public class OccurrenceHdfsRecordTransformTest {
     ext.put(Extension.MEASUREMENT_OR_FACT.getRowType(), Collections.singletonList(ext1));
 
     ExtendedRecord er = ExtendedRecord.newBuilder().setId("777").setExtensions(ext).build();
-    GbifIdRecord id =
-        GbifIdRecord.newBuilder().setId("777").setGbifId(777L).setTriplet("setTriplet").build();
+    IdentifierRecord id =
+        IdentifierRecord.newBuilder()
+            .setId("777")
+            .setInternalId("777")
+            .setAssociatedKey("setTriplet")
+            .build();
     MetadataRecord mr =
         MetadataRecord.newBuilder().setId("777").setDatasetTitle("setDatasetTitle").build();
     BasicRecord br =
@@ -93,7 +98,11 @@ public class OccurrenceHdfsRecordTransformTest {
             .build();
     LocationRecord lr = LocationRecord.newBuilder().setId("777").setCountry("setCountry").build();
     EventCoreRecord ecr =
-        EventCoreRecord.newBuilder().setId("777").setParentEventID("setParentEventID").build();
+        EventCoreRecord.newBuilder()
+            .setId("777")
+            .setParentEventID("setParentEventID")
+            .setCreated(new Date().getTime())
+            .build();
     MultimediaRecord mmr = MultimediaRecord.newBuilder().setId("777").build();
     AudubonRecord aur = AudubonRecord.newBuilder().setId("777").build();
     ImageRecord imr = ImageRecord.newBuilder().setId("777").build();
@@ -119,7 +128,7 @@ public class OccurrenceHdfsRecordTransformTest {
     OccurrenceHdfsRecordTransform transform =
         OccurrenceHdfsRecordTransform.builder()
             .extendedRecordTag(verbatimTransform.getTag())
-            .gbifIdRecordTag(idTransform.getTag())
+            .identifierRecordTag(idTransform.getTag())
             .basicRecordTag(basicTransform.getTag())
             .clusteringRecordTag(clusteringTransform.getTag())
             .temporalRecordTag(temporalTransform.getTag())
@@ -137,7 +146,7 @@ public class OccurrenceHdfsRecordTransformTest {
     PCollection<KV<String, ExtendedRecord>> verbatimCollection =
         p.apply("Create er", Create.of(er)).apply("KV er", verbatimTransform.toKv());
 
-    PCollection<KV<String, GbifIdRecord>> idCollection =
+    PCollection<KV<String, IdentifierRecord>> idCollection =
         p.apply("Create id", Create.of(id)).apply("KV id", idTransform.toKv());
 
     PCollection<KV<String, ClusteringRecord>> clusteringCollection =

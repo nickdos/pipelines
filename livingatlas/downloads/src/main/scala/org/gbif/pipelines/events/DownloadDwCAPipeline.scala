@@ -13,6 +13,7 @@ import org.gbif.api.model.common.search.SearchParameter
 import org.gbif.api.model.predicate.Predicate
 import org.gbif.dwc.terms.DwcTerm
 import org.gbif.predicate.query.{ALAEventSearchParameter, ALAEventSparkQueryVisitor, ALAEventTermsMapper}
+import org.slf4j.LoggerFactory
 
 import java.io.{BufferedInputStream, File, FileInputStream, FileOutputStream}
 import java.net.{URI, URL}
@@ -25,6 +26,7 @@ import scala.xml.Elem
 object DownloadDwCAPipeline {
 
   val workingDirectory = "/tmp/pipelines-export/"
+  val log = LoggerFactory.getLogger(this.getClass)
 
   val SKIPPED_FIELDS = List(
     "id",
@@ -88,7 +90,7 @@ object DownloadDwCAPipeline {
     spark.sparkContext.setLogLevel("ERROR")
     spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
 
-    System.out.println("Load search index")
+    log.info("Load search index")
     val eventSearchDF = spark.read.format("avro").
       load(s"${hdfsPath}/${datasetId}/${attempt}/search/event/*.avro").as("Search")
 
@@ -102,26 +104,26 @@ object DownloadDwCAPipeline {
       eventSearchDF.select(col("Search.id"))
     }
 
-    System.out.println("Load event core")
+    log.info("Load event core")
     val eventCoreDF = spark.read.format("avro").
       load(s"${hdfsPath}/${datasetId}/${attempt}/event/event/*.avro").as("Core")
 
-    System.out.println("Load location")
+    log.info("Load location")
     val locationDF = spark.read.format("avro").
       load(s"${hdfsPath}/${datasetId}/${attempt}/event/location/*.avro").as("Location")
 
-    System.out.println("Load temporal")
+    log.info("Load temporal")
     val temporalDF = spark.read.format("avro").
       load(s"${hdfsPath}/${datasetId}/${attempt}/event/temporal/*.avro").as("Temporal")
 
-    System.out.println("Join")
+    log.info("Join")
     val filterDownloadDF = filterSearchDF.select(col("Search.id")).
       join(eventCoreDF, col("Search.id") === col("Core.id"), "inner").
       join(locationDF, col("Search.id") === col("Location.id"), "inner").
       join(temporalDF, col("Search.id") === col("Temporal.id"), "inner")
 
     // generate interpreted event export
-    System.out.println("Export interpreted event data")
+    log.info("Export interpreted event data")
     val (eventExportDF, eventFields) = generateInterpretedExportDF(filterDownloadDF)
     eventExportDF
       .write
@@ -239,23 +241,23 @@ object DownloadDwCAPipeline {
     // If an occurrence extension was supplied
     if (extensionList.contains(DwcTerm.Occurrence.qualifiedName())) {
 
-      System.out.println("Load basic  for occurrences")
+      log.info("Load basic  for occurrences")
       val occBasicDF = spark.read.format("avro").
         load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/basic/*.avro").as("OccBasic").filter("parentId is NOT NULL")
 
-      System.out.println("Load occurrences")
+      log.info("Load occurrences")
       val occTaxonDF = spark.read.format("avro").
         load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/ala_taxonomy/*.avro").as("OccTaxon").filter("parentId is NOT NULL")
 
-      System.out.println("Load temporal  for occurrences")
+      log.info("Load temporal  for occurrences")
       val occTemporalDF = spark.read.format("avro").
         load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/temporal/*.avro").as("OccTemporal").filter("parentId is NOT NULL")
 
-      System.out.println("Load location for occurrences")
+      log.info("Load location for occurrences")
       val occLocationDF = spark.read.format("avro").
         load(s"${hdfsPath}/${datasetId}/${attempt}/occurrence/location/*.avro").as("OccLocation").filter("parentId is NOT NULL")
 
-      System.out.println("Create occurrence join DF")
+      log.info("Create occurrence join DF")
       val occDF = occBasicDF.
           join(occTaxonDF, col("OccBasic.id") === col("OccTaxon.id"), "inner").
           join(occLocationDF, col("OccBasic.id") === col("OccLocation.id"), "inner").
@@ -264,10 +266,10 @@ object DownloadDwCAPipeline {
       val joinOccDF = filterDownloadDF.select(col("Core.id")).
         join(occDF, col("Core.id") === col("OccBasic.parentId"), "inner")
 
-      System.out.println("Generate interpreted occurrence DF for export")
+      log.info("Generate interpreted occurrence DF for export")
       val (exportDF, fields) = generateInterpretedExportDF(joinOccDF)
 
-      System.out.println("Export interpreted occurrence data")
+      log.info("Export interpreted occurrence data")
       exportDF.write
         .option("header", "true")
         .option("sep", "\t")

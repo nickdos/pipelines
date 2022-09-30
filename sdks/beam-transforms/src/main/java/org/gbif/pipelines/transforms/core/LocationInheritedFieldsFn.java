@@ -77,11 +77,6 @@ public class LocationInheritedFieldsFn
 
       LocationInheritedFields parent = recordsMap.get(parentId);
 
-      // required for bad data - where parentEventID refers to event not in dataset
-      if (parent == null) {
-        return false;
-      }
-
       if (parent.getCountryCode() != null) {
         builder.setCountryCode(parent.getCountryCode());
         assigned = true;

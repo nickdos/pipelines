@@ -25,7 +25,7 @@ import org.gbif.pipelines.io.avro.BasicRecord;
 import org.gbif.pipelines.io.avro.ClusteringRecord;
 import org.gbif.pipelines.io.avro.EventCoreRecord;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
-import org.gbif.pipelines.io.avro.GbifIdRecord;
+import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.ImageRecord;
 import org.gbif.pipelines.io.avro.LocationRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
@@ -33,6 +33,7 @@ import org.gbif.pipelines.io.avro.MultimediaRecord;
 import org.gbif.pipelines.io.avro.OccurrenceHdfsRecord;
 import org.gbif.pipelines.io.avro.TaxonRecord;
 import org.gbif.pipelines.io.avro.TemporalRecord;
+import org.gbif.pipelines.io.avro.extension.ac.AudubonTable;
 import org.gbif.pipelines.io.avro.extension.dwc.MeasurementOrFactTable;
 import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmMeasurementTrialTable;
 import org.gbif.pipelines.io.avro.extension.obis.ExtendedMeasurementOrFactTable;
@@ -85,7 +86,7 @@ public class OccurrenceToHdfsViewPipelineIT {
       "--inputPath=" + output,
       "--targetPath=" + input,
       "--numberOfShards=1",
-      "--interpretationTypes=OCCURRENCE,MEASUREMENT_OR_FACT_TABLE,EXTENDED_MEASUREMENT_OR_FACT_TABLE,GERMPLASM_MEASUREMENT_TRIAL_TABLE",
+      "--interpretationTypes=OCCURRENCE,MEASUREMENT_OR_FACT_TABLE,EXTENDED_MEASUREMENT_OR_FACT_TABLE,GERMPLASM_MEASUREMENT_TRIAL_TABLE,AUDUBON_TABLE",
       "--properties=" + outputFile + "/lock.yaml"
     };
     InterpretationPipelineOptions optionsWriter =
@@ -112,11 +113,12 @@ public class OccurrenceToHdfsViewPipelineIT {
           ExtendedRecord.newBuilder().setId(ID).setExtensions(ext).build();
       writer.append(extendedRecord);
     }
-    try (SyncDataFileWriter<GbifIdRecord> writer =
+    try (SyncDataFileWriter<IdentifierRecord> writer =
         InterpretedAvroWriter.createAvroWriter(
             optionsWriter, GbifIdTransform.builder().create(), coreTerm, postfix)) {
-      GbifIdRecord gbifIdRecord = GbifIdRecord.newBuilder().setId(ID).setGbifId(1L).build();
-      writer.append(gbifIdRecord);
+      IdentifierRecord identifierRecord =
+          IdentifierRecord.newBuilder().setId(ID).setInternalId("1").build();
+      writer.append(identifierRecord);
     }
     try (SyncDataFileWriter<ClusteringRecord> writer =
         InterpretedAvroWriter.createAvroWriter(
@@ -133,7 +135,8 @@ public class OccurrenceToHdfsViewPipelineIT {
     try (SyncDataFileWriter<MetadataRecord> writer =
         InterpretedAvroWriter.createAvroWriter(
             optionsWriter, MetadataTransform.builder().create(), coreTerm, postfix)) {
-      MetadataRecord metadataRecord = MetadataRecord.newBuilder().setId(ID).build();
+      MetadataRecord metadataRecord =
+          MetadataRecord.newBuilder().setId(ID).setDatasetKey("dataset_key").build();
       writer.append(metadataRecord);
     }
     try (SyncDataFileWriter<TemporalRecord> writer =
@@ -188,7 +191,7 @@ public class OccurrenceToHdfsViewPipelineIT {
       "--inputPath=" + input,
       "--targetPath=" + output,
       "--numberOfShards=1",
-      "--interpretationTypes=OCCURRENCE,MEASUREMENT_OR_FACT_TABLE,EXTENDED_MEASUREMENT_OR_FACT_TABLE,GERMPLASM_MEASUREMENT_TRIAL_TABLE",
+      "--interpretationTypes=OCCURRENCE,MEASUREMENT_OR_FACT_TABLE,EXTENDED_MEASUREMENT_OR_FACT_TABLE,GERMPLASM_MEASUREMENT_TRIAL_TABLE,AUDUBON_TABLE",
       "--testMode=true"
     };
     InterpretationPipelineOptions options = PipelinesOptionsFactory.createInterpretation(args);
@@ -201,22 +204,13 @@ public class OccurrenceToHdfsViewPipelineIT {
                 + s
                 + "/d596fccb-2319-42eb-b13b-986c932780ad_147-00000-of-00001.avro";
 
+    assertFile(OccurrenceHdfsRecord.class, outputFn.apply("occurrence"));
+    assertFile(MeasurementOrFactTable.class, outputFn.apply("measurementorfacttable"));
     assertFile(
-        OccurrenceHdfsRecord.class,
-        outputFn.apply("occurrence"),
-        PipelinesVariables.Pipeline.Interpretation.RecordType.OCCURRENCE);
+        ExtendedMeasurementOrFactTable.class, outputFn.apply("extendedmeasurementorfacttable"));
     assertFile(
-        MeasurementOrFactTable.class,
-        outputFn.apply("measurementorfacttable"),
-        PipelinesVariables.Pipeline.Interpretation.RecordType.MEASUREMENT_OR_FACT_TABLE);
-    assertFile(
-        ExtendedMeasurementOrFactTable.class,
-        outputFn.apply("extendedmeasurementorfacttable"),
-        PipelinesVariables.Pipeline.Interpretation.RecordType.EXTENDED_MEASUREMENT_OR_FACT_TABLE);
-    assertFile(
-        GermplasmMeasurementTrialTable.class,
-        outputFn.apply("germplasmmeasurementtrialtable"),
-        PipelinesVariables.Pipeline.Interpretation.RecordType.GERMPLASM_MEASUREMENT_TRAIT_TABLE);
+        GermplasmMeasurementTrialTable.class, outputFn.apply("germplasmmeasurementtrialtable"));
+    assertFile(AudubonTable.class, outputFn.apply("audubontable"));
     assertFileExistFalse(outputFn.apply("permittable"));
     assertFileExistFalse(outputFn.apply("loantable"));
   }
@@ -283,11 +277,12 @@ public class OccurrenceToHdfsViewPipelineIT {
               .build();
       writer.append(extendedRecord);
     }
-    try (SyncDataFileWriter<GbifIdRecord> writer =
+    try (SyncDataFileWriter<IdentifierRecord> writer =
         InterpretedAvroWriter.createAvroWriter(
             optionsWriter, GbifIdTransform.builder().create(), coreTerm, postfix)) {
-      GbifIdRecord gbifIdRecord = GbifIdRecord.newBuilder().setId(ID).setGbifId(1L).build();
-      writer.append(gbifIdRecord);
+      IdentifierRecord identifierRecord =
+          IdentifierRecord.newBuilder().setId(ID).setInternalId("1").build();
+      writer.append(identifierRecord);
     }
     try (SyncDataFileWriter<ClusteringRecord> writer =
         InterpretedAvroWriter.createAvroWriter(
@@ -382,8 +377,7 @@ public class OccurrenceToHdfsViewPipelineIT {
                 + s
                 + "/d596fccb-2319-42eb-b13b-986c932780ad_147-00000-of-00001.avro";
 
-    assertFile(
-        OccurrenceHdfsRecord.class, outputFn.apply(recordType.name().toLowerCase()), recordType);
+    assertFile(OccurrenceHdfsRecord.class, outputFn.apply(recordType.name().toLowerCase()));
     assertFileExistFalse(outputFn.apply("measurementorfacttable"));
     assertFileExistFalse(outputFn.apply("extendedmeasurementorfacttable"));
     assertFileExistFalse(outputFn.apply("germplasmmeasurementtrialtable"));
@@ -395,10 +389,7 @@ public class OccurrenceToHdfsViewPipelineIT {
     Assert.assertFalse(new File(output).exists());
   }
 
-  private <T extends SpecificRecordBase> void assertFile(
-      Class<T> clazz,
-      String output,
-      PipelinesVariables.Pipeline.Interpretation.RecordType recordType)
+  private <T extends SpecificRecordBase> void assertFile(Class<T> clazz, String output)
       throws Exception {
     File file = new File(output);
     DatumReader<T> ohrDatumReader = new SpecificDatumReader<>(clazz);
@@ -406,14 +397,8 @@ public class OccurrenceToHdfsViewPipelineIT {
       while (dataFileReader.hasNext()) {
         T record = dataFileReader.next();
         Assert.assertNotNull(record);
-        Assert.assertEquals(isCoreType(recordType) ? ID : "1", record.get("gbifid"));
+        Assert.assertEquals("1", record.get("gbifid"));
       }
     }
-  }
-
-  private static boolean isCoreType(
-      PipelinesVariables.Pipeline.Interpretation.RecordType recordType) {
-    return recordType == PipelinesVariables.Pipeline.Interpretation.RecordType.OCCURRENCE
-        || recordType == PipelinesVariables.Pipeline.Interpretation.RecordType.EVENT;
   }
 }

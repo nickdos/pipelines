@@ -1209,6 +1209,9 @@ public class CoreTsvConverterTest {
     // When
     String result = CoreCsvConverter.convert(source);
 
+    System.out.println("### EXPECTED " + String.join("\t", expected));
+    System.out.println("##### RESULT " + result);
+
     // Should
     Assert.assertEquals(String.join("\t", expected), result);
   }

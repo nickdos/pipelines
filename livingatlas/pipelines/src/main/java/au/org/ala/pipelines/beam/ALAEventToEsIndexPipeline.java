@@ -286,7 +286,7 @@ public class ALAEventToEsIndexPipeline {
             ? ALAOccurrenceToEsIndexPipeline.IndexingTransform.builder()
                 .pipeline(p)
                 .identifiersPathFn(identifiersPathFn)
-                .pathFn(occurrencesPathFn)
+                .occurrencePathFn(occurrencesPathFn)
                 .eventsPathFn(eventsPathFn)
                 .asParentChildRecord(true)
                 .build()

@@ -18,7 +18,11 @@ import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.TypeDescriptor;
 import org.gbif.pipelines.common.beam.coders.EdgeCoder;
 import org.gbif.pipelines.core.pojo.Edge;
-import org.gbif.pipelines.io.avro.*;
+import org.gbif.pipelines.io.avro.EventCoreRecord;
+import org.gbif.pipelines.io.avro.LocationRecord;
+import org.gbif.pipelines.io.avro.Record;
+import org.gbif.pipelines.io.avro.TaxonRecord;
+import org.gbif.pipelines.io.avro.TemporalRecord;
 
 /**
  * Emits a list of Edge records for each parent id in the list EventCoreRecord.getParentEventIds.
@@ -63,31 +67,11 @@ public class ParentEventExpandTransform<T extends SpecificRecordBase & Record>
     }
   }
 
-  /** Taxon parent transform. */
-  public static class ALATaxonParentEventExpandTransform
-      extends ParentEventExpandTransform<ALATaxonRecord> {
-
-    public ALATaxonParentEventExpandTransform(
-        TupleTag<ALATaxonRecord> recordTupleTag,
-        TupleTag<EventCoreRecord> eventCoreRecordTupleTag,
-        TupleTag<Edge<ALATaxonRecord>> edgeTupleTag) {
-      super(recordTupleTag, eventCoreRecordTupleTag, edgeTupleTag, ALATaxonRecord.class);
-    }
-  }
-
   public static TaxonParentEventExpandTransform createTaxonTransform(
       TupleTag<TaxonRecord> recordTupleTag,
       TupleTag<EventCoreRecord> eventCoreRecordTupleTag,
       TupleTag<Edge<TaxonRecord>> edgeTupleTag) {
     return new TaxonParentEventExpandTransform(
-        recordTupleTag, eventCoreRecordTupleTag, edgeTupleTag);
-  }
-
-  public static ALATaxonParentEventExpandTransform createALATaxonTransform(
-      TupleTag<ALATaxonRecord> recordTupleTag,
-      TupleTag<EventCoreRecord> eventCoreRecordTupleTag,
-      TupleTag<Edge<ALATaxonRecord>> edgeTupleTag) {
-    return new ALATaxonParentEventExpandTransform(
         recordTupleTag, eventCoreRecordTupleTag, edgeTupleTag);
   }
 

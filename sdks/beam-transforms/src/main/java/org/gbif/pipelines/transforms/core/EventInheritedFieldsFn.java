@@ -76,11 +76,6 @@ public class EventInheritedFieldsFn
 
       EventInheritedFields parent = recordsMap.get(parentId);
 
-      // required for bad data - where parentEventID refers to event not in dataset
-      if (parent == null) {
-        return builder;
-      }
-
       if (parent.getLocationID() != null) {
         builder.setLocationID(parent.getLocationID());
         builder.setInheritedFrom(parent.getId());

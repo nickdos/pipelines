@@ -1,19 +1,23 @@
 package org.gbif.pipelines.ingest.java.pipelines;
 
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.AMPLIFICATION_TABLE_RECORDS_COUNT;
+import static org.gbif.pipelines.common.PipelinesVariables.Metrics.AUDUBON_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.CHRONOMETRIC_AGE_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.CLONING_TABLE_RECORDS_COUNT;
+import static org.gbif.pipelines.common.PipelinesVariables.Metrics.DNA_DERIVED_DATA_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.EXTENDED_MEASUREMENT_OR_FACT_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.GEL_IMAGE_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.GERMPLASM_ACCESSION_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.IDENTIFICATION_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.IDENTIFIER_TABLE_RECORDS_COUNT;
+import static org.gbif.pipelines.common.PipelinesVariables.Metrics.IMAGE_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.LOAN_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.MATERIAL_SAMPLE_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.MEASUREMENT_OR_FACT_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.MEASUREMENT_SCORE_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.MEASUREMENT_TRAIT_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.MEASUREMENT_TRIAL_TABLE_RECORDS_COUNT;
+import static org.gbif.pipelines.common.PipelinesVariables.Metrics.MULTIMEDIA_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.PERMIT_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.PREPARATION_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.PRESERVATION_TABLE_RECORDS_COUNT;
@@ -25,8 +29,8 @@ import static org.gbif.pipelines.ingest.java.transforms.InterpretedAvroReader.re
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -47,8 +51,10 @@ import org.gbif.pipelines.common.beam.options.InterpretationPipelineOptions;
 import org.gbif.pipelines.common.beam.options.PipelinesOptionsFactory;
 import org.gbif.pipelines.common.beam.utils.PathBuilder;
 import org.gbif.pipelines.core.converters.AmplificationTableConverter;
+import org.gbif.pipelines.core.converters.AudubonTableConverter;
 import org.gbif.pipelines.core.converters.ChronometricAgeTableConverter;
 import org.gbif.pipelines.core.converters.CloningTableConverter;
+import org.gbif.pipelines.core.converters.DnaDerivedDataTableConverter;
 import org.gbif.pipelines.core.converters.ExtendedMeasurementOrFactTableConverter;
 import org.gbif.pipelines.core.converters.GelImageTableConverter;
 import org.gbif.pipelines.core.converters.GermplasmAccessionTableConverter;
@@ -57,9 +63,11 @@ import org.gbif.pipelines.core.converters.GermplasmMeasurementTraitTableConverte
 import org.gbif.pipelines.core.converters.GermplasmMeasurementTrialTableConverter;
 import org.gbif.pipelines.core.converters.IdentificationTableConverter;
 import org.gbif.pipelines.core.converters.IdentifierTableConverter;
+import org.gbif.pipelines.core.converters.ImageTableConverter;
 import org.gbif.pipelines.core.converters.LoanTableConverter;
 import org.gbif.pipelines.core.converters.MaterialSampleTableConverter;
 import org.gbif.pipelines.core.converters.MeasurementOrFactTableConverter;
+import org.gbif.pipelines.core.converters.MultimediaTableConverter;
 import org.gbif.pipelines.core.converters.PermitTableConverter;
 import org.gbif.pipelines.core.converters.PreparationTableConverter;
 import org.gbif.pipelines.core.converters.PreservationTableConverter;
@@ -79,7 +87,7 @@ import org.gbif.pipelines.io.avro.BasicRecord;
 import org.gbif.pipelines.io.avro.ClusteringRecord;
 import org.gbif.pipelines.io.avro.EventCoreRecord;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
-import org.gbif.pipelines.io.avro.GbifIdRecord;
+import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.ImageRecord;
 import org.gbif.pipelines.io.avro.LocationRecord;
 import org.gbif.pipelines.io.avro.MeasurementOrFactRecord;
@@ -88,11 +96,15 @@ import org.gbif.pipelines.io.avro.MultimediaRecord;
 import org.gbif.pipelines.io.avro.OccurrenceHdfsRecord;
 import org.gbif.pipelines.io.avro.TaxonRecord;
 import org.gbif.pipelines.io.avro.TemporalRecord;
+import org.gbif.pipelines.io.avro.extension.ac.AudubonTable;
 import org.gbif.pipelines.io.avro.extension.dwc.ChronometricAgeTable;
 import org.gbif.pipelines.io.avro.extension.dwc.IdentificationTable;
 import org.gbif.pipelines.io.avro.extension.dwc.MeasurementOrFactTable;
 import org.gbif.pipelines.io.avro.extension.dwc.ResourceRelationshipTable;
+import org.gbif.pipelines.io.avro.extension.gbif.DnaDerivedDataTable;
 import org.gbif.pipelines.io.avro.extension.gbif.IdentifierTable;
+import org.gbif.pipelines.io.avro.extension.gbif.ImageTable;
+import org.gbif.pipelines.io.avro.extension.gbif.MultimediaTable;
 import org.gbif.pipelines.io.avro.extension.gbif.ReferenceTable;
 import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmAccessionTable;
 import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmMeasurementScoreTable;
@@ -240,7 +252,7 @@ public class HdfsViewPipeline {
     CompletableFuture<Map<String, ExtendedRecord>> verbatimMapFeature =
         readAvroAsFuture(options, coreTerm, executor, VerbatimTransform.create());
 
-    CompletableFuture<Map<String, GbifIdRecord>> idMapFeature =
+    CompletableFuture<Map<String, IdentifierRecord>> idMapFeature =
         readAvroAsFuture(options, coreTerm, executor, GbifIdTransform.builder().create());
 
     CompletableFuture<Map<String, ClusteringRecord>> clusteringMapFeature =
@@ -270,12 +282,13 @@ public class HdfsViewPipeline {
     CompletableFuture<Map<String, AudubonRecord>> audubonMapFeature =
         readAvroAsFuture(options, coreTerm, executor, AudubonTransform.builder().create());
 
-    Map<String, GbifIdRecord> idRecordMap = idMapFeature.get();
+    Map<String, IdentifierRecord> idRecordMap = idMapFeature.get();
+    MetadataRecord metadataRecord = metadataMapFeature.get().values().iterator().next();
 
-    OccurrenceHdfsRecordConverter.OccurrenceHdfsRecordConverterBuilder builder =
+    OccurrenceHdfsRecordConverter.OccurrenceHdfsRecordConverterBuilder occurrenceBuilder =
         OccurrenceHdfsRecordConverter.builder()
             .metrics(metrics)
-            .metadata(metadataMapFeature.get().values().iterator().next())
+            .metadata(metadataRecord)
             .verbatimMap(verbatimMapFeature.get())
             .temporalMap(temporalMapFeature.get())
             .locationMap(locationMapFeature.get())
@@ -285,7 +298,7 @@ public class HdfsViewPipeline {
             .audubonMap(audubonMapFeature.get());
 
     if (OCCURRENCE == recordType) {
-      builder
+      occurrenceBuilder
           .basicMap(basicMapFeature.get())
           .grscicollMap(grscicollMapFeature.get())
           .clusteringMap(clusteringMapFeature.get());
@@ -294,16 +307,13 @@ public class HdfsViewPipeline {
     if (RecordType.EVENT == recordType) {
       CompletableFuture<Map<String, EventCoreRecord>> eventCoreMapFeature =
           readAvroAsFuture(options, coreTerm, executor, EventCoreTransform.builder().create());
-      builder.eventCoreRecordMap(eventCoreMapFeature.get());
+      occurrenceBuilder.eventCoreRecordMap(eventCoreMapFeature.get());
     }
 
     // OccurrenceHdfsRecord
-    Function<GbifIdRecord, Optional<OccurrenceHdfsRecord>> occurrenceHdfsRecordFn =
-        builder.build().getFn();
-
     TableRecordWriter.<OccurrenceHdfsRecord>builder()
-        .recordFunction(occurrenceHdfsRecordFn)
-        .gbifIdRecords(idRecordMap.values())
+        .recordFunction(occurrenceBuilder.build().getFn())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(OccurrenceHdfsRecord.getClassSchema())
         .executor(executor)
@@ -314,10 +324,11 @@ public class HdfsViewPipeline {
         .write();
 
     // MeasurementOrFactTable
-    Function<GbifIdRecord, Optional<MeasurementOrFactTable>> measurementOrFactFn =
+    Function<IdentifierRecord, List<MeasurementOrFactTable>> measurementOrFactFn =
         TableConverter.<MeasurementOrFactTable>builder()
             .metrics(metrics)
             .converterFn(MeasurementOrFactTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(MEASUREMENT_OR_FACT_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -325,7 +336,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<MeasurementOrFactTable>builder()
         .recordFunction(measurementOrFactFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(MeasurementOrFactTable.getClassSchema())
         .executor(executor)
@@ -336,10 +347,11 @@ public class HdfsViewPipeline {
         .write();
 
     // IdentificationTable
-    Function<GbifIdRecord, Optional<IdentificationTable>> identificationFn =
+    Function<IdentifierRecord, List<IdentificationTable>> identificationFn =
         TableConverter.<IdentificationTable>builder()
             .metrics(metrics)
             .converterFn(IdentificationTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(IDENTIFICATION_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -347,7 +359,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<IdentificationTable>builder()
         .recordFunction(identificationFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(IdentificationTable.getClassSchema())
         .executor(executor)
@@ -358,10 +370,11 @@ public class HdfsViewPipeline {
         .write();
 
     // ResourceRelationTable
-    Function<GbifIdRecord, Optional<ResourceRelationshipTable>> resourceRelationFn =
+    Function<IdentifierRecord, List<ResourceRelationshipTable>> resourceRelationFn =
         TableConverter.<ResourceRelationshipTable>builder()
             .metrics(metrics)
             .converterFn(ResourceRelationshipTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(RESOURCE_RELATIONSHIP_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -369,7 +382,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<ResourceRelationshipTable>builder()
         .recordFunction(resourceRelationFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(ResourceRelationshipTable.getClassSchema())
         .executor(executor)
@@ -380,10 +393,11 @@ public class HdfsViewPipeline {
         .write();
 
     // AmplificationTable
-    Function<GbifIdRecord, Optional<AmplificationTable>> amplificationFn =
+    Function<IdentifierRecord, List<AmplificationTable>> amplificationFn =
         TableConverter.<AmplificationTable>builder()
             .metrics(metrics)
             .converterFn(AmplificationTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(AMPLIFICATION_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -391,7 +405,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<AmplificationTable>builder()
         .recordFunction(amplificationFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(AmplificationTable.getClassSchema())
         .executor(executor)
@@ -402,10 +416,11 @@ public class HdfsViewPipeline {
         .write();
 
     // CloningTable
-    Function<GbifIdRecord, Optional<CloningTable>> cloningFn =
+    Function<IdentifierRecord, List<CloningTable>> cloningFn =
         TableConverter.<CloningTable>builder()
             .metrics(metrics)
             .converterFn(CloningTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(CLONING_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -413,7 +428,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<CloningTable>builder()
         .recordFunction(cloningFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(CloningTable.getClassSchema())
         .executor(executor)
@@ -424,10 +439,11 @@ public class HdfsViewPipeline {
         .write();
 
     // GelImageTable
-    Function<GbifIdRecord, Optional<GelImageTable>> gelImageFn =
+    Function<IdentifierRecord, List<GelImageTable>> gelImageFn =
         TableConverter.<GelImageTable>builder()
             .metrics(metrics)
             .converterFn(GelImageTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(GEL_IMAGE_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -435,7 +451,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<GelImageTable>builder()
         .recordFunction(gelImageFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(GelImageTable.getClassSchema())
         .executor(executor)
@@ -446,10 +462,11 @@ public class HdfsViewPipeline {
         .write();
 
     // LoanTable
-    Function<GbifIdRecord, Optional<LoanTable>> loanFn =
+    Function<IdentifierRecord, List<LoanTable>> loanFn =
         TableConverter.<LoanTable>builder()
             .metrics(metrics)
             .converterFn(LoanTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(LOAN_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -457,7 +474,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<LoanTable>builder()
         .recordFunction(loanFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(LoanTable.getClassSchema())
         .executor(executor)
@@ -468,10 +485,11 @@ public class HdfsViewPipeline {
         .write();
 
     // MaterialSampleTable
-    Function<GbifIdRecord, Optional<MaterialSampleTable>> materialSampleFn =
+    Function<IdentifierRecord, List<MaterialSampleTable>> materialSampleFn =
         TableConverter.<MaterialSampleTable>builder()
             .metrics(metrics)
             .converterFn(MaterialSampleTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(MATERIAL_SAMPLE_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -479,7 +497,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<MaterialSampleTable>builder()
         .recordFunction(materialSampleFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(MaterialSampleTable.getClassSchema())
         .executor(executor)
@@ -490,10 +508,11 @@ public class HdfsViewPipeline {
         .write();
 
     // PermitTable
-    Function<GbifIdRecord, Optional<PermitTable>> permitFn =
+    Function<IdentifierRecord, List<PermitTable>> permitFn =
         TableConverter.<PermitTable>builder()
             .metrics(metrics)
             .converterFn(PermitTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(PERMIT_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -501,7 +520,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<PermitTable>builder()
         .recordFunction(permitFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(PermitTable.getClassSchema())
         .executor(executor)
@@ -512,10 +531,11 @@ public class HdfsViewPipeline {
         .write();
 
     // PreparationTable
-    Function<GbifIdRecord, Optional<PreparationTable>> preparationFn =
+    Function<IdentifierRecord, List<PreparationTable>> preparationFn =
         TableConverter.<PreparationTable>builder()
             .metrics(metrics)
             .converterFn(PreparationTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(PREPARATION_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -523,7 +543,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<PreparationTable>builder()
         .recordFunction(preparationFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(PreparationTable.getClassSchema())
         .executor(executor)
@@ -534,10 +554,11 @@ public class HdfsViewPipeline {
         .write();
 
     // PreservationTable
-    Function<GbifIdRecord, Optional<PreservationTable>> preservationFn =
+    Function<IdentifierRecord, List<PreservationTable>> preservationFn =
         TableConverter.<PreservationTable>builder()
             .metrics(metrics)
             .converterFn(PreservationTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(PRESERVATION_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -545,7 +566,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<PreservationTable>builder()
         .recordFunction(preservationFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(PreservationTable.getClassSchema())
         .executor(executor)
@@ -556,10 +577,11 @@ public class HdfsViewPipeline {
         .write();
 
     // MeasurementScoreTable
-    Function<GbifIdRecord, Optional<GermplasmMeasurementScoreTable>> measurementScoreFn =
+    Function<IdentifierRecord, List<GermplasmMeasurementScoreTable>> measurementScoreFn =
         TableConverter.<GermplasmMeasurementScoreTable>builder()
             .metrics(metrics)
             .converterFn(GermplasmMeasurementScoreTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(MEASUREMENT_SCORE_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -567,7 +589,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<GermplasmMeasurementScoreTable>builder()
         .recordFunction(measurementScoreFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(GermplasmMeasurementScoreTable.getClassSchema())
         .executor(executor)
@@ -578,10 +600,11 @@ public class HdfsViewPipeline {
         .write();
 
     // MeasurementTraitTable
-    Function<GbifIdRecord, Optional<GermplasmMeasurementTraitTable>> measurementTraitFn =
+    Function<IdentifierRecord, List<GermplasmMeasurementTraitTable>> measurementTraitFn =
         TableConverter.<GermplasmMeasurementTraitTable>builder()
             .metrics(metrics)
             .converterFn(GermplasmMeasurementTraitTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(MEASUREMENT_TRAIT_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -589,7 +612,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<GermplasmMeasurementTraitTable>builder()
         .recordFunction(measurementTraitFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(GermplasmMeasurementTraitTable.getClassSchema())
         .executor(executor)
@@ -600,10 +623,11 @@ public class HdfsViewPipeline {
         .write();
 
     // MeasurementTrialTable
-    Function<GbifIdRecord, Optional<GermplasmMeasurementTrialTable>> measurementTrialFn =
+    Function<IdentifierRecord, List<GermplasmMeasurementTrialTable>> measurementTrialFn =
         TableConverter.<GermplasmMeasurementTrialTable>builder()
             .metrics(metrics)
             .converterFn(GermplasmMeasurementTrialTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(MEASUREMENT_TRIAL_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -611,7 +635,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<GermplasmMeasurementTrialTable>builder()
         .recordFunction(measurementTrialFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(GermplasmMeasurementTrialTable.getClassSchema())
         .executor(executor)
@@ -622,10 +646,11 @@ public class HdfsViewPipeline {
         .write();
 
     // GermplasmAccessionTable
-    Function<GbifIdRecord, Optional<GermplasmAccessionTable>> germplasmAccessionFn =
+    Function<IdentifierRecord, List<GermplasmAccessionTable>> germplasmAccessionFn =
         TableConverter.<GermplasmAccessionTable>builder()
             .metrics(metrics)
             .converterFn(GermplasmAccessionTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(GERMPLASM_ACCESSION_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -633,7 +658,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<GermplasmAccessionTable>builder()
         .recordFunction(germplasmAccessionFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(GermplasmAccessionTable.getClassSchema())
         .executor(executor)
@@ -644,10 +669,11 @@ public class HdfsViewPipeline {
         .write();
 
     // ExtendedMeasurementOrFactTable
-    Function<GbifIdRecord, Optional<ExtendedMeasurementOrFactTable>> extendedMeasurementOrFactFn =
+    Function<IdentifierRecord, List<ExtendedMeasurementOrFactTable>> extendedMeasurementOrFactFn =
         TableConverter.<ExtendedMeasurementOrFactTable>builder()
             .metrics(metrics)
             .converterFn(ExtendedMeasurementOrFactTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(EXTENDED_MEASUREMENT_OR_FACT_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -655,7 +681,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<ExtendedMeasurementOrFactTable>builder()
         .recordFunction(extendedMeasurementOrFactFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(ExtendedMeasurementOrFactTable.getClassSchema())
         .executor(executor)
@@ -666,10 +692,11 @@ public class HdfsViewPipeline {
         .write();
 
     // ChronometricAgeTable
-    Function<GbifIdRecord, Optional<ChronometricAgeTable>> chronometricAgeFn =
+    Function<IdentifierRecord, List<ChronometricAgeTable>> chronometricAgeFn =
         TableConverter.<ChronometricAgeTable>builder()
             .metrics(metrics)
             .converterFn(ChronometricAgeTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(CHRONOMETRIC_AGE_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -677,7 +704,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<ChronometricAgeTable>builder()
         .recordFunction(chronometricAgeFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(ChronometricAgeTable.getClassSchema())
         .executor(executor)
@@ -688,10 +715,11 @@ public class HdfsViewPipeline {
         .write();
 
     // ReferencesTable
-    Function<GbifIdRecord, Optional<ReferenceTable>> referencesFn =
+    Function<IdentifierRecord, List<ReferenceTable>> referencesFn =
         TableConverter.<ReferenceTable>builder()
             .metrics(metrics)
             .converterFn(ReferenceTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(REFERENCE_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -699,7 +727,7 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<ReferenceTable>builder()
         .recordFunction(referencesFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(ReferenceTable.getClassSchema())
         .executor(executor)
@@ -710,10 +738,11 @@ public class HdfsViewPipeline {
         .write();
 
     // IdentifierTable
-    Function<GbifIdRecord, Optional<IdentifierTable>> identifierFn =
+    Function<IdentifierRecord, List<IdentifierTable>> identifierFn =
         TableConverter.<IdentifierTable>builder()
             .metrics(metrics)
             .converterFn(IdentifierTableConverter::convert)
+            .metadataRecord(metadataRecord)
             .counterName(IDENTIFIER_TABLE_RECORDS_COUNT)
             .verbatimMap(verbatimMapFeature.get())
             .build()
@@ -721,12 +750,104 @@ public class HdfsViewPipeline {
 
     TableRecordWriter.<IdentifierTable>builder()
         .recordFunction(identifierFn)
-        .gbifIdRecords(idRecordMap.values())
+        .identifierRecords(idRecordMap.values())
         .targetPathFn(pathFn)
         .schema(IdentifierTable.getClassSchema())
         .executor(executor)
         .options(options)
         .recordType(IDENTIFIER_TABLE)
+        .types(types)
+        .build()
+        .write();
+
+    // DnaDerivedDataTable
+    Function<IdentifierRecord, List<DnaDerivedDataTable>> dnaDerivedDataFn =
+        TableConverter.<DnaDerivedDataTable>builder()
+            .metrics(metrics)
+            .converterFn(DnaDerivedDataTableConverter::convert)
+            .metadataRecord(metadataRecord)
+            .counterName(DNA_DERIVED_DATA_TABLE_RECORDS_COUNT)
+            .verbatimMap(verbatimMapFeature.get())
+            .build()
+            .getFn();
+
+    TableRecordWriter.<DnaDerivedDataTable>builder()
+        .recordFunction(dnaDerivedDataFn)
+        .identifierRecords(idRecordMap.values())
+        .targetPathFn(pathFn)
+        .schema(DnaDerivedDataTable.getClassSchema())
+        .executor(executor)
+        .options(options)
+        .recordType(DNA_DERIVED_DATA_TABLE)
+        .types(types)
+        .build()
+        .write();
+
+    // AudubonTable
+    Function<IdentifierRecord, List<AudubonTable>> audubonFn =
+        TableConverter.<AudubonTable>builder()
+            .metrics(metrics)
+            .converterFn(AudubonTableConverter::convert)
+            .metadataRecord(metadataRecord)
+            .counterName(AUDUBON_TABLE_RECORDS_COUNT)
+            .verbatimMap(verbatimMapFeature.get())
+            .build()
+            .getFn();
+
+    TableRecordWriter.<AudubonTable>builder()
+        .recordFunction(audubonFn)
+        .identifierRecords(idRecordMap.values())
+        .targetPathFn(pathFn)
+        .schema(AudubonTable.getClassSchema())
+        .executor(executor)
+        .options(options)
+        .recordType(AUDUBON_TABLE)
+        .types(types)
+        .build()
+        .write();
+
+    // ImageTable
+    Function<IdentifierRecord, List<ImageTable>> imageFn =
+        TableConverter.<ImageTable>builder()
+            .metrics(metrics)
+            .converterFn(ImageTableConverter::convert)
+            .metadataRecord(metadataRecord)
+            .counterName(IMAGE_TABLE_RECORDS_COUNT)
+            .verbatimMap(verbatimMapFeature.get())
+            .build()
+            .getFn();
+
+    TableRecordWriter.<ImageTable>builder()
+        .recordFunction(imageFn)
+        .identifierRecords(idRecordMap.values())
+        .targetPathFn(pathFn)
+        .schema(ImageTable.getClassSchema())
+        .executor(executor)
+        .options(options)
+        .recordType(IMAGE_TABLE)
+        .types(types)
+        .build()
+        .write();
+
+    // MultimediaTable
+    Function<IdentifierRecord, List<MultimediaTable>> multimediaFn =
+        TableConverter.<MultimediaTable>builder()
+            .metrics(metrics)
+            .converterFn(MultimediaTableConverter::convert)
+            .metadataRecord(metadataRecord)
+            .counterName(MULTIMEDIA_TABLE_RECORDS_COUNT)
+            .verbatimMap(verbatimMapFeature.get())
+            .build()
+            .getFn();
+
+    TableRecordWriter.<MultimediaTable>builder()
+        .recordFunction(multimediaFn)
+        .identifierRecords(idRecordMap.values())
+        .targetPathFn(pathFn)
+        .schema(MultimediaTable.getClassSchema())
+        .executor(executor)
+        .options(options)
+        .recordType(MULTIMEDIA_TABLE)
         .types(types)
         .build()
         .write();
