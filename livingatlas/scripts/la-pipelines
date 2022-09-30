@@ -452,7 +452,6 @@ function dwca-avro () {
           -Djava.io.tmpdir=$DWCA_TMP \
           -cp $LOCAL_PIPELINES_JAR $CLASS \
           --datasetId=$dr \
-          --deleteLockFileOnExit=true \
           --config=$config $ARGS \
           --experiments=use_deprecated_read
       logStepEnd "DWCA-AVRO conversion" $dr local $SECONDS
@@ -470,7 +469,6 @@ function dwca-avro () {
               -cp $LOCAL_PIPELINES_JAR $CLASS \
               --datasetId=$dr \
               --inputPath=$inputPath \
-              --deleteLockFileOnExit=false \
               --config=$config $ARGS
 
       done < /tmp/dataset-archive-list.csv

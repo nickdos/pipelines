@@ -90,8 +90,6 @@ import org.slf4j.MDC;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ALAOccurrenceToEsIndexPipeline {
 
-  public static final TupleTag<DenormalisedEvent> DENORM_TAG = new TupleTag<DenormalisedEvent>();
-
   public static void main(String[] args) throws Exception {
     String[] combinedArgs = new CombinedYamlConfiguration(args).toArgs("general", "elastic");
     EsIndexingPipelineOptions options = PipelinesOptionsFactory.createIndexing(combinedArgs);

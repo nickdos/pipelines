@@ -4,7 +4,6 @@ import com.google.common.util.concurrent.Service;
 import org.gbif.cli.Command;
 import org.gbif.cli.service.ServiceCommand;
 import org.gbif.pipelines.common.hdfs.HdfsViewConfiguration;
-import org.gbif.pipelines.tasks.occurrences.hdfs.HdfsViewService;
 import org.kohsuke.MetaInfServices;
 
 /**

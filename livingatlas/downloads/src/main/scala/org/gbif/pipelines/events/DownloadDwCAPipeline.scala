@@ -45,9 +45,6 @@ object DownloadDwCAPipeline {
       return;
     }
 
-//    val args = Array("dr18391", "hdfs://localhost:9000/pipelines-data", "1", "generate", "false", "{}")
-    // val args = Array("dr18391", "hdfs:///pipelines-data", "1", "generate", "false", "{}")
-
     import java.util.UUID
     val datasetId = args(0)
     val hdfsPath = args(1)
@@ -94,7 +91,6 @@ object DownloadDwCAPipeline {
     System.out.println("Load search index")
     val eventSearchDF = spark.read.format("avro").
       load(s"${hdfsPath}/${datasetId}/${attempt}/search/event/*.avro").as("Search")
-
 
     // get a list columns
     val exportPath = workingDirectory + jobID + s"/Event/"

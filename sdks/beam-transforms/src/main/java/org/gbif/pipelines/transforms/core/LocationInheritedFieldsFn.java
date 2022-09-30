@@ -79,7 +79,7 @@ public class LocationInheritedFieldsFn
 
       // required for bad data - where parentEventID refers to event not in dataset
       if (parent == null) {
-        return assigned;
+        return false;
       }
 
       if (parent.getCountryCode() != null) {

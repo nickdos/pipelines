@@ -80,7 +80,6 @@ public class ALAParentJsonTransform implements Serializable {
   @NonNull private final PCollectionView<ALAMetadataRecord> metadataView;
   @NonNull private final TupleTag<DerivedMetadataRecord> derivedMetadataRecordTag;
   @NonNull private final TupleTag<MeasurementOrFactRecord> measurementOrFactRecordTag;
-  private final TupleTag<DenormalisedEvent> denormalisedEventTag;
   private final TupleTag<String[]> samplingProtocolsTag;
 
   @NonNull private final TupleTag<LocationInheritedRecord> locationInheritedRecordTag;
