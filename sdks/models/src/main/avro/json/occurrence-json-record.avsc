@@ -4,7 +4,7 @@
     "name":"Taxonomy",
     "namespace":"org.gbif.pipelines.io.avro.json",
     "type":"record",
-    "doc":"Represents the occurrence json object for elasticsearch document",
+    "doc":"Used to create a index to support autocomplete on top of the occurrences",
     "fields":[
       {"name":"taxonKey","type":["null","string"],"default":null,"doc":""},
       {"name":"name","type":["null","string"],"default":null,"doc":""}
@@ -122,7 +122,7 @@
       {"name":"mediaLicenses","type":{"type":"array","items":"string"},"default":null,"doc":""},
       {"name":"multimediaItems","type":{"type":"array","items":"Multimedia"},"default":null,"doc":""},
       {"name":"verbatim","type":["null","VerbatimRecord"],"default":null,"doc":""},
-      // Denormalised event info
+      // De-normalised event info
       {"name":"eventHierarchy","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"eventTypeHierarchy","type":{"type":"array","items":"string"},"default":[],"doc":""},
       {"name":"eventHierarchyJoined","type":["null","string"],"default":null,"doc":""},
