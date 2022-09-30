@@ -60,7 +60,7 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 @Category(NeedsRunner.class)
-public class OccurrenceToHdfsViewPipelineIT {
+public class HdfsViewPipelineIT {
 
   private static final String ID = "777";
 
@@ -195,7 +195,7 @@ public class OccurrenceToHdfsViewPipelineIT {
       "--testMode=true"
     };
     InterpretationPipelineOptions options = PipelinesOptionsFactory.createInterpretation(args);
-    OccurrenceToHdfsViewPipeline.run(options, opt -> p);
+    HdfsViewPipeline.run(options, opt -> p);
 
     Function<String, String> outputFn =
         s ->
@@ -365,8 +365,9 @@ public class OccurrenceToHdfsViewPipelineIT {
     };
 
     InterpretationPipelineOptions options = PipelinesOptionsFactory.createInterpretation(args);
+    options.setCoreRecordType(recordType);
 
-    HdfsViewPipeline.run(options, opt -> p, recordType);
+    HdfsViewPipeline.run(options, opt -> p);
 
     Function<String, String> outputFn =
         s ->

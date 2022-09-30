@@ -117,6 +117,8 @@ public class CoreInterpreter {
                 GbifTerm.eventType, parentValues.get(GbifTerm.eventType.name()), vocabularyService)
             .ifPresent(c -> parentBuilder.setEventType(c.getConcept()));
 
+        // allow the raw event type value through if not matched to vocab
+        // this is useful as vocab is a WIP
         if (parentBuilder.getEventType() == null) {
           parentBuilder.setEventType(parentValues.get(GbifTerm.eventType.name()));
         }

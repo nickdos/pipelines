@@ -16,7 +16,7 @@ tmp
 minicluster
 release.properties
 sdks/models/src/main/avro/table/
-examples
+examples/dwca-to-elasticsearch/configs/*.json
 
 # la-pipelines debian package
 livingatlas/debian/*.debhelper
