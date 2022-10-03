@@ -10,6 +10,7 @@ public class ALAEventTermsMapper implements SQLTermsMapper<ALAEventSearchParamet
 
   private static final Map<SearchParameter, ? extends Term> PARAM_TO_TERM =
       ImmutableMap.<SearchParameter, Term>builder()
+           // DWC style formatting
           .put(ALAEventSearchParameter.countryCode, DwcTerm.countryCode)
           .put(ALAEventSearchParameter.datasetKey, GbifTerm.datasetKey)
           .put(ALAEventSearchParameter.eventHierarchy, ALASearchTerm.eventHierarchy)
@@ -21,6 +22,15 @@ public class ALAEventTermsMapper implements SQLTermsMapper<ALAEventSearchParamet
           .put(ALAEventSearchParameter.stateProvince, DwcTerm.stateProvince)
           .put(ALAEventSearchParameter.taxonKey, GbifTerm.taxonKey)
           .put(ALAEventSearchParameter.year, DwcTerm.year)
+           // GBIF API style formatting
+          .put(ALAEventSearchParameter.COUNTRY_CODE, DwcTerm.countryCode)
+          .put(ALAEventSearchParameter.DATASET_KEY, GbifTerm.datasetKey)
+          .put(ALAEventSearchParameter.LOCATION_ID, DwcTerm.locationID)
+          .put(ALAEventSearchParameter.MONTH, DwcTerm.month)
+          .put(ALAEventSearchParameter.SAMPLING_PROTOCOL, DwcTerm.samplingProtocol)
+          .put(ALAEventSearchParameter.STATE_PROVINCE, DwcTerm.stateProvince)
+          .put(ALAEventSearchParameter.TAXON_KEY, GbifTerm.taxonKey)
+          .put(ALAEventSearchParameter.YEAR, DwcTerm.year)
           .build();
   private static final Map<SearchParameter, Term> ARRAY_STRING_TERMS =
       ImmutableMap.<SearchParameter, Term>builder()

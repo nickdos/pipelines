@@ -12,7 +12,7 @@ public enum ALASearchTerm implements Term, Serializable {
   private static final URI NS_URI = URI.create("http://ala.org.au/terms/1.0/");
   private static final String PREFIX = "ala";
 
-  private ALASearchTerm() {}
+  ALASearchTerm() {}
 
   @Override
   public String prefix() {
