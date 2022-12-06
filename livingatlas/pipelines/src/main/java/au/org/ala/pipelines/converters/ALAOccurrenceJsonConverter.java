@@ -36,6 +36,8 @@ public class ALAOccurrenceJsonConverter {
 
   private final MeasurementOrFactRecord measurementOrFact;
 
+  private final ALASensitivityRecord sensitivityRecord;
+
   public OccurrenceJsonRecord convert() {
 
     OccurrenceJsonRecord.Builder builder = OccurrenceJsonRecord.newBuilder();
@@ -175,7 +177,7 @@ public class ALAOccurrenceJsonConverter {
 
       // add the single type to hierarchy for consistency
       List<String> eventTypeHierarchy = new ArrayList<>();
-      eventTypeHierarchy.add("Occurrence");
+      eventTypeHierarchy.add(builder.getBasisOfRecord());
       builder.setEventTypeHierarchy(eventTypeHierarchy);
     }
   }
