@@ -35,9 +35,10 @@ import org.slf4j.LoggerFactory
 import java.nio.channels.Channels
 import java.nio.file.Files
 import java.util
-import scala.collection.mutable.ArrayBuffer
 import scala.xml.{Elem, Node, PrettyPrinter}
 
+/** Command line parameter parsing for running the pipeline
+  */
 @Parameters(separators = "=")
 class CmdArgs {
 
@@ -160,14 +161,50 @@ object PredicateExportDwCAPipeline {
       }
     }
 
-    val jobID = if (exportArgs.jobId != null && !exportArgs.jobId.isEmpty) {
+    val jobID = createJobID(exportArgs)
+
+    // Process the query filter
+    val queryFilter = constructQuery(exportArgs)
+
+    val hdfsConfigs = HdfsConfigs.create(exportArgs.hdfsSiteConfig, exportArgs.coreSiteConfig)
+    val config: ALAPipelinesConfig = ALAPipelinesConfigFactory.getInstance(hdfsConfigs, exportArgs.properties).get
+
+    log.info(s"Export for ${exportArgs.datasetId} - jobId ${jobID}")
+    log.info(s"Generated query: $queryFilter")
+
+    val exportPath = createExportPath(exportArgs)
+
+    runExport(
+      exportArgs.datasetId,
+      exportArgs.inputPath,
+      exportPath,
+      exportArgs.attempt,
+      queryFilter,
+      exportArgs.skipExportFields.toArray(Array[String]()),
+      exportArgs.hdfsSiteConfig,
+      exportArgs.coreSiteConfig,
+      config.collectory.getWsUrl()
+    )
+  }
+
+  private def createJobID(exportArgs: CmdArgs) = {
+    if (exportArgs.jobId != null && !exportArgs.jobId.isEmpty) {
       exportArgs.jobId
     } else {
       UUID.randomUUID.toString
     }
+  }
 
-    // Process the query filter
-    val queryFilter = if (exportArgs.queryFilePath != null && !exportArgs.queryFilePath.isEmpty) {
+  private def createExportPath(exportArgs: CmdArgs) = {
+    if (exportArgs.jobId != null && !exportArgs.jobId.isEmpty) {
+      exportArgs.localExportPath + "/" + exportArgs.jobId
+    } else {
+      exportArgs.localExportPath
+    }
+  }
+
+  private def constructQuery(exportArgs: CmdArgs) = {
+    if (exportArgs.queryFilePath != null && !exportArgs.queryFilePath.isEmpty) {
       val lines = scala.io.Source.fromFile(exportArgs.queryFilePath).mkString
       val om = new ObjectMapper()
       om.addMixIn(classOf[SearchParameter], classOf[ALAEventSearchParameter])
@@ -184,31 +221,6 @@ object PredicateExportDwCAPipeline {
     } else {
       ""
     }
-
-    val hdfsConfigs = HdfsConfigs.create(exportArgs.hdfsSiteConfig, exportArgs.coreSiteConfig)
-    val config: ALAPipelinesConfig = ALAPipelinesConfigFactory.getInstance(hdfsConfigs, exportArgs.properties).get
-
-    log.info(s"Export for ${exportArgs.datasetId} - jobId ${jobID}")
-    log.info(s"Generated query: $queryFilter")
-
-    val exportPath = if (exportArgs.jobId != null && !exportArgs.jobId.isEmpty) {
-
-      exportArgs.localExportPath + "/" + exportArgs.jobId
-    } else {
-      exportArgs.localExportPath
-    }
-
-    runExport(
-      exportArgs.datasetId,
-      exportArgs.inputPath,
-      exportPath,
-      exportArgs.attempt,
-      queryFilter,
-      exportArgs.skipExportFields.toArray(Array[String]()),
-      exportArgs.hdfsSiteConfig,
-      exportArgs.coreSiteConfig,
-      config.collectory.getWsUrl()
-    )
   }
 
   def runExport(
@@ -435,6 +447,12 @@ object PredicateExportDwCAPipeline {
     extensionsForMeta.toMap
   }
 
+  def sanitise(fieldName: String): String =
+    if (fieldName.lastIndexOf("/") > 0)
+      fieldName.substring(fieldName.lastIndexOf("/") + 1)
+    else
+      fieldName
+
   private def exportOccurrence(
       datasetId: String,
       hdfsPath: String,
@@ -479,13 +497,7 @@ object PredicateExportDwCAPipeline {
       localExportPath
     )
 
-    def sanitise(fieldName: String): String =
-      if (fieldName.lastIndexOf("/") > 0)
-        fieldName.substring(fieldName.lastIndexOf("/") + 1)
-      else
-        fieldName
-
-    // get field names
+    // Export verbatim occurrence records
     val fieldNameStructureSchema = new StructType()
       .add("fieldName", StringType)
     val rowRDD = joinOccDF
