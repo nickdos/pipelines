@@ -33,7 +33,7 @@ import org.gbif.pipelines.core.pojo.HdfsConfigs
 import org.slf4j.LoggerFactory
 
 import java.nio.channels.Channels
-import java.nio.file.Files
+import java.nio.file.{Files}
 import java.util
 import scala.xml.{Elem, Node, PrettyPrinter}
 
@@ -357,7 +357,6 @@ object PredicateExportDwCAPipeline {
     val coreForExportDF = verbatimDFJoined.select(columns: _*)
     coreForExportDF
       .select("*")
-      .coalesce(1)
       .write
       .option("header", "true")
       .option("sep", "\t")
@@ -427,7 +426,6 @@ object PredicateExportDwCAPipeline {
 
         extensionForExportDF
           .select("*")
-          .coalesce(1)
           .write
           .option("header", "true")
           .option("sep", "\t")
@@ -515,7 +513,6 @@ object PredicateExportDwCAPipeline {
 
     joinOccDF
       .select(colsToSelect: _*)
-      .coalesce(1)
       .write
       .option("header", "true")
       .option("sep", "\t")
@@ -722,21 +719,20 @@ object PredicateExportDwCAPipeline {
     // move part-* file to {extension_name}.txt
     log.info("Cleaning up extension " + extensionSimpleName)
 
+    // concat the files
     val file = new File(s"$localExportPath/$extensionSimpleName")
-    val outputFile = file.listFiles
+    val outputFiles = file.listFiles
       .filter(exportFile => exportFile != null && exportFile.isFile)
       .filter(_.getName.startsWith("part-"))
       .map(_.getPath)
       .toList
-      .head
 
-    // move to sensible name
-    FileUtils.moveFile(
-      new File(outputFile),
-      new File(
-        s"$localExportPath/${extensionSimpleName.toLowerCase()}.txt"
-      )
-    )
+    val combined = new FileOutputStream(s"$localExportPath/${extensionSimpleName.toLowerCase()}.txt", true).getChannel
+
+    outputFiles.foreach { file =>
+      val partFile = new FileInputStream(file).getChannel
+      combined.transferFrom(partFile, combined.size, partFile.size)
+    }
 
     // remote temporary directory
     FileUtils.forceDelete(

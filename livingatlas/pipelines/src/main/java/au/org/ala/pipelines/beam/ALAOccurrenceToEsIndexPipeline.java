@@ -153,7 +153,8 @@ public class ALAOccurrenceToEsIndexPipeline {
     log.info("Adding step 4: Elasticsearch indexing");
     ElasticsearchIO.ConnectionConfiguration esConfig =
         ElasticsearchIO.ConnectionConfiguration.create(
-            options.getEsHosts(), options.getEsIndexName(), "_doc");
+                options.getEsHosts(), options.getEsIndexName(), "_doc")
+            .withConnectTimeout(180000);
 
     ElasticsearchIO.Write writeIO =
         ElasticsearchIO.write()
