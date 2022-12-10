@@ -117,7 +117,7 @@ export:
 
 predicate-export:
   inputPath: hdfs:///pipelines-data
-  targetPath: hdfs:///pipelines-data
+  targetPath: hdfs:///pipelines-export
 
 gbifConfig:
   vocabularyConfig:

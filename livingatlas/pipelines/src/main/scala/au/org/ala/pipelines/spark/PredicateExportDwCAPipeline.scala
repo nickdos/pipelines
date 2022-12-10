@@ -4,12 +4,11 @@ import au.org.ala.kvs.{ALAPipelinesConfig, ALAPipelinesConfigFactory}
 
 import _root_.java.io._
 import _root_.java.net._
-import _root_.java.util.{Collections, UUID}
-import _root_.java.util.zip._
+import _root_.java.util.{UUID}
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, LocatedFileStatus, Path, RemoteIterator}
 import org.apache.spark.sql.functions.{col, concat_ws}
 import org.apache.spark.sql.types.{
   ArrayType,
@@ -21,7 +20,7 @@ import org.apache.spark.sql.types.{
   StringType,
   StructType
 }
-import org.apache.spark.sql.{Column, DataFrame, Dataset, Row, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 import org.gbif.api.model.common.search.SearchParameter
 import org.gbif.api.model.predicate.Predicate
@@ -29,113 +28,15 @@ import org.gbif.dwc.terms.DwcTerm
 import au.org.ala.predicate.{ALAEventSearchParameter, ALAEventSparkQueryVisitor, ALAEventTermsMapper}
 import au.org.ala.utils.CombinedYamlConfiguration
 import com.beust.jcommander.{JCommander, Parameter, Parameters}
+import com.google.common.io.ByteStreams
+import org.gbif.hadoop.compress.d2.{D2CombineInputStream, D2Utils}
+import org.gbif.hadoop.compress.d2.zip.ModalZipOutputStream
 import org.gbif.pipelines.core.pojo.HdfsConfigs
 import org.slf4j.LoggerFactory
 
 import java.nio.channels.Channels
-import java.nio.file.{Files}
 import java.util
 import scala.xml.{Elem, Node, PrettyPrinter}
-
-/** Command line parameter parsing for running the pipeline
-  */
-@Parameters(separators = "=")
-class CmdArgs {
-
-  @Parameter(
-    names = Array("--datasetId"),
-    description = "The dataset ID e.g. dr123",
-    required = true
-  )
-  var datasetId: String = null
-
-  @Parameter(
-    names = Array("--query"),
-    description = "Predicate JSON query ",
-    required = false
-  )
-  var query: String = null
-
-  @Parameter(
-    names = Array("--queryFile"),
-    description = "Absolute path to a file containing predicate JSON query ",
-    required = false
-  )
-  var queryFilePath: String = null
-
-  @Parameter(
-    names = Array("--inputPath"),
-    description = "Filesystem / HDFS path to input AVRO",
-    required = false
-  )
-  var inputPath: String = null
-
-  @Parameter(
-    names = Array("--targetPath"),
-    description = "Filesystem / HDFS path to input AVRO",
-    required = false
-  )
-  var targetPath: String = null
-
-  @Parameter(
-    names = Array("--localExportPath"),
-    description = "Filesystem / HDFS path to DwCA output ",
-    required = true
-  )
-  var localExportPath: String = null
-
-  @Parameter(
-    names = Array("--attempt"),
-    description = "Attempt number",
-    required = false
-  )
-  var attempt: Int = 1
-
-  @Parameter(
-    names = Array("--hdfsSiteConfig"),
-    description = "Path to HDFS config",
-    required = false
-  )
-  var hdfsSiteConfig: String = null
-
-  @Parameter(
-    names = Array("--coreSiteConfig"),
-    description = "Path to Core site HDFS config",
-    required = false
-  )
-  var coreSiteConfig: String = null
-
-  @Parameter(
-    names = Array("--properties"),
-    description = "Properties YAML file",
-    required = false
-  )
-  var properties: String = null
-
-  @Parameter(names = Array("--jobId"), description = "Job ID", required = false)
-  var jobId: String = null
-
-  @Parameter(
-    names = Array("--skipExportFields"),
-    description = "List of fields to ignore",
-    required = false,
-    splitter = classOf[YamlListSplitter]
-  )
-  var skipExportFields: java.util.List[String] = Collections.emptyList()
-
-  @Parameter(names = Array("--experiments"), description = "Ignore", required = false)
-  var experiments: String = null
-}
-
-import com.beust.jcommander.converters.IParameterSplitter
-
-class YamlListSplitter extends IParameterSplitter {
-  override def split(value: String): java.util.List[String] = {
-    val cleaned = value.substring(1, value.length() - 1)
-    val values = cleaned.split(",").map(_.trim)
-    util.Arrays.asList[String](values: _*)
-  }
-}
 
 /** Pipeline uses Spark SQL to produce a DwCA Archive.
   */
@@ -172,15 +73,18 @@ object PredicateExportDwCAPipeline {
     log.info(s"Export for ${exportArgs.datasetId} - jobId ${jobID}")
     log.info(s"Generated query: $queryFilter")
 
-    val exportPath = createExportPath(exportArgs)
+    val localExportPath = createExportPath(exportArgs)
+    log.info("Local export path = " + localExportPath)
 
     runExport(
       exportArgs.datasetId,
       exportArgs.inputPath,
-      exportPath,
+      createTargetExportPath(exportArgs),
+      localExportPath,
       exportArgs.attempt,
       queryFilter,
-      exportArgs.skipExportFields.toArray(Array[String]()),
+      exportArgs.skipEventExportFields.toArray(Array[String]()),
+      exportArgs.skipOccurrenceExportFields.toArray(Array[String]()),
       exportArgs.hdfsSiteConfig,
       exportArgs.coreSiteConfig,
       config.collectory.getWsUrl()
@@ -192,6 +96,14 @@ object PredicateExportDwCAPipeline {
       exportArgs.jobId
     } else {
       UUID.randomUUID.toString
+    }
+  }
+
+  private def createTargetExportPath(exportArgs: CmdArgs) = {
+    if (exportArgs.jobId != null && !exportArgs.jobId.isEmpty) {
+      exportArgs.targetPath + "/" + exportArgs.jobId + "/" + exportArgs.datasetId
+    } else {
+      exportArgs.targetPath + "/" + exportArgs.datasetId
     }
   }
 
@@ -226,10 +138,12 @@ object PredicateExportDwCAPipeline {
   def runExport(
       datasetId: String,
       inputPath: String,
+      targetPath: String,
       localExportPath: String,
       attempt: Int,
       queryFilter: String,
-      skippedFields: Array[String],
+      skipEventExportFields: Array[String],
+      skipOccurrenceExportFields: Array[String],
       hdfsSiteConf: String,
       coreSiteConf: String,
       registryUrl: String
@@ -248,8 +162,6 @@ object PredicateExportDwCAPipeline {
     spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
 
     // get a list columns
-    val exportPath = s"$localExportPath/$datasetId/Event/"
-
     log.info("Load search index")
     val filterSearchDF = {
 
@@ -268,27 +180,24 @@ object PredicateExportDwCAPipeline {
 
     // generate interpreted event export
     log.info("Export interpreted event data")
-    val (eventExportDF, eventFields) = generateInterpretedExportDF(filterSearchDF, skippedFields)
+    val (eventExportDF, eventFields) = generateInterpretedExportDF(filterSearchDF, skipEventExportFields)
 
     eventExportDF.write
       .option("header", "true")
       .option("sep", "\t")
       .mode("overwrite")
-      .csv(exportPath)
-
-    cleanupFileExport("Event", hdfsSiteConf, coreSiteConf, localExportPath + s"/$datasetId")
+      .option("codec", "org.gbif.hadoop.compress.d2.D2Codec")
+      .csv(s"$targetPath/Event/")
 
     // export interpreted occurrence
     val (occurrenceFields, verbatimOccurrenceFields) = exportOccurrence(
       datasetId,
       inputPath,
+      targetPath,
       attempt,
       spark,
       filterSearchDF,
-      skippedFields,
-      hdfsSiteConf,
-      coreSiteConf,
-      localExportPath + s"/$datasetId"
+      skipOccurrenceExportFields
     )
 
     // load the verbatim DF
@@ -307,18 +216,14 @@ object PredicateExportDwCAPipeline {
     val verbatimCoreFields = exportVerbatimCore(
       spark,
       verbatimDFJoined,
-      hdfsSiteConf,
-      coreSiteConf,
-      localExportPath + s"/$datasetId"
+      targetPath
     )
 
     // export the supplied extensions verbatim
     val verbatimExtensionsForMeta = exportVerbatimExtensions(
       spark,
       verbatimDFJoined,
-      hdfsSiteConf,
-      coreSiteConf,
-      localExportPath + s"/$datasetId"
+      targetPath
     )
 
     // shutdown spark session
@@ -326,6 +231,9 @@ object PredicateExportDwCAPipeline {
 
     // package ZIP
     createZip(
+      hdfsSiteConf,
+      coreSiteConf,
+      targetPath: String,
       datasetId,
       DwcTerm.Event.qualifiedName(),
       eventFields,
@@ -343,9 +251,7 @@ object PredicateExportDwCAPipeline {
   private def exportVerbatimCore(
       spark: SparkSession,
       verbatimDFJoined: DataFrame,
-      hdfsSiteConf: String,
-      coreSiteConf: String,
-      localExportPath: String
+      targetPath: String
   ) = {
 
     val coreFields =
@@ -361,13 +267,8 @@ object PredicateExportDwCAPipeline {
       .option("header", "true")
       .option("sep", "\t")
       .mode("overwrite")
-      .csv(s"$localExportPath/Verbatim_Event")
-    cleanupFileExport(
-      "Verbatim_Event",
-      hdfsSiteConf,
-      coreSiteConf,
-      localExportPath
-    )
+      .option("codec", "org.gbif.hadoop.compress.d2.D2Codec")
+      .csv(s"$targetPath/Verbatim_Event")
 
     coreFields
   }
@@ -375,9 +276,7 @@ object PredicateExportDwCAPipeline {
   private def exportVerbatimExtensions(
       spark: SparkSession,
       verbatimDFJoined: DataFrame,
-      hdfsSiteConf: String,
-      coreSiteConf: String,
-      localExportPath: String
+      targetPath: String
   ) = {
 
     val extensionsForMeta =
@@ -430,14 +329,9 @@ object PredicateExportDwCAPipeline {
           .option("header", "true")
           .option("sep", "\t")
           .mode("overwrite")
-          .csv(s"$localExportPath/Verbatim_$extensionSimpleName")
+          .option("codec", "org.gbif.hadoop.compress.d2.D2Codec")
+          .csv(s"$targetPath/Verbatim_$extensionSimpleName")
 
-        cleanupFileExport(
-          "Verbatim_" + extensionSimpleName,
-          hdfsSiteConf,
-          coreSiteConf,
-          localExportPath
-        )
         extensionsForMeta(extensionURI) = extensionFields
       }
     })
@@ -453,20 +347,18 @@ object PredicateExportDwCAPipeline {
 
   private def exportOccurrence(
       datasetId: String,
-      hdfsPath: String,
+      inputPath: String,
+      targetPath: String,
       attempt: Int,
       spark: SparkSession,
       filterDownloadDF: DataFrame,
-      skippedFields: Array[String],
-      hdfsSiteConfig: String,
-      coreSiteConfig: String,
-      localExportPath: String
+      skippedFields: Array[String]
   ): (Array[String], Array[String]) = {
     // If an occurrence extension was supplied
     log.info("Create occurrence join DF")
     val occDF = spark.read
       .format("avro")
-      .load(s"${hdfsPath}/${datasetId}/${attempt}/search/occurrence/*.avro")
+      .load(s"${inputPath}/${datasetId}/${attempt}/search/occurrence/*.avro")
       .as("Occurrence")
       .filter("coreId is NOT NULL")
 
@@ -486,14 +378,8 @@ object PredicateExportDwCAPipeline {
       .option("header", "true")
       .option("sep", "\t")
       .mode("overwrite")
-      .csv(s"$localExportPath/Occurrence")
-
-    cleanupFileExport(
-      "Occurrence",
-      hdfsSiteConfig,
-      coreSiteConfig,
-      localExportPath
-    )
+      .option("codec", "org.gbif.hadoop.compress.d2.D2Codec")
+      .csv(s"$targetPath/Occurrence")
 
     // Export verbatim occurrence records
     val fieldNameStructureSchema = new StructType()
@@ -517,14 +403,8 @@ object PredicateExportDwCAPipeline {
       .option("header", "true")
       .option("sep", "\t")
       .mode("overwrite")
-      .csv(s"$localExportPath/Verbatim_Occurrence")
-
-    cleanupFileExport(
-      "Verbatim_Occurrence",
-      hdfsSiteConfig,
-      coreSiteConfig,
-      localExportPath
-    )
+      .option("codec", "org.gbif.hadoop.compress.d2.D2Codec")
+      .csv(s"$targetPath/Verbatim_Occurrence")
 
     (fields, verbatimFieldNames)
   }
@@ -599,6 +479,9 @@ object PredicateExportDwCAPipeline {
   }
 
   private def createZip(
+      hdfsSiteConf: String,
+      coreSiteConf: String,
+      targetPath: String,
       datasetId: String,
       coreTermType: String,
       coreFieldList: Array[String],
@@ -619,32 +502,98 @@ object PredicateExportDwCAPipeline {
       verbatimOccurrenceFields,
       extensionsForMeta
     )
-    save(metaXml, s"$localExportPath/$datasetId/meta.xml")
+
+    log.info(s"Creating export directory meta XML to path: $localExportPath/$datasetId")
+    FileUtils.forceMkdir(new File(s"$localExportPath/$datasetId"))
+
+    val metaXmlPath = s"$localExportPath/$datasetId/meta.xml"
+    log.info(s"Writing meta XML to path: $metaXmlPath")
+    save(metaXml, metaXmlPath)
 
     // get EML doc
     import sys.process._
+    val emlXmlPath = s"$localExportPath/$datasetId/eml.xml"
+    log.info(s"Writing EML XML to path: $emlXmlPath")
     val registryUrlClean = if (registryUrl.endsWith("/")) registryUrl else registryUrl + "/"
     new URL(s"${registryUrlClean}eml/${datasetId}") #> new File(
-      s"$localExportPath/$datasetId/eml.xml"
+      emlXmlPath
     ) !!
 
-    // create a zip
-    val zip = new ZipOutputStream(
-      new FileOutputStream(
-        new File(s"$localExportPath/${datasetId}.zip")
-      )
-    )
-    new File(s"$localExportPath/$datasetId").listFiles().foreach { file =>
-      if (!file.getName.endsWith(datasetId + ".zip")) {
-        log.info("Zipping " + file.getName)
-        zip.putNextEntry(new ZipEntry(file.getName))
-        Files.copy(file.toPath, zip)
-        zip.flush()
-        zip.closeEntry()
+    val sourceFs: FileSystem = {
+      FileSystem.get({
+        if (!targetPath.startsWith("hdfs:")) {
+          new Configuration()
+        } else {
+          val conf = new Configuration
+          conf.addResource(new File(hdfsSiteConf).toURI().toURL())
+          conf.addResource(new File(coreSiteConf).toURI().toURL())
+          conf
+        }
+      })
+    }
+
+    val targetFs: FileSystem = FileSystem.getLocal(new Configuration())
+    val zipPath = localExportPath + "/" + datasetId + ".zip"
+    log.info(s"Writing Zip to path: $zipPath")
+    val zipped = targetFs.create(new Path(zipPath), true)
+    val out = new ModalZipOutputStream(new BufferedOutputStream(zipped, 10 * 1024 * 1024))
+
+    val fileStatuses: Array[FileStatus] =
+      sourceFs.listStatus(new Path(targetPath))
+
+    fileStatuses.foreach { fs =>
+      val path = fs.getPath
+      if (sourceFs.isDirectory(path)) {
+        addZipEntry(sourceFs, targetPath, path.getName, out)
       }
     }
-    zip.flush()
-    zip.close()
+
+    // add meta
+    out.putNextEntry(new org.gbif.hadoop.compress.d2.zip.ZipEntry("meta.xml"), ModalZipOutputStream.MODE.DEFAULT)
+    ByteStreams.copy(new FileInputStream(new File(metaXmlPath)), out)
+    out.flush()
+    out.closeEntry()
+
+    // add eml.xml
+    out.putNextEntry(new org.gbif.hadoop.compress.d2.zip.ZipEntry("eml.xml"), ModalZipOutputStream.MODE.DEFAULT)
+    ByteStreams.copy(new FileInputStream(new File(emlXmlPath)), out)
+    out.flush()
+    out.closeEntry()
+
+    out.flush()
+    out.close()
+  }
+
+  def addZipEntry(
+      sourceFs: FileSystem,
+      targetPath: String,
+      extension: String,
+      out: ModalZipOutputStream
+  ): Unit = {
+
+    val parts = new util.ArrayList[InputStream]()
+    val remoteFile: RemoteIterator[LocatedFileStatus] =
+      sourceFs.listFiles(new Path(targetPath + "/" + extension), false)
+
+    while ({ remoteFile.hasNext }) {
+      val fs = remoteFile.next
+      val path = fs.getPath
+      if (path.toString.endsWith(D2Utils.FILE_EXTENSION)) {
+        log.info("Deflated content to merge: {} ", path)
+        parts.add(sourceFs.open(path))
+      }
+    }
+
+    // create the Zip entry, and write the compressed bytes
+    val ze = new org.gbif.hadoop.compress.d2.zip.ZipEntry(extension.toLowerCase() + ".txt")
+    out.putNextEntry(ze, ModalZipOutputStream.MODE.PRE_DEFLATED)
+    val in = new D2CombineInputStream(parts)
+    ByteStreams.copy(in, out)
+    in.close(); // important so counts are accurate
+    ze.setSize(in.getUncompressedLength()); // important to set the sizes and CRC
+    ze.setCompressedSize(in.getCompressedLength());
+    ze.setCrc(in.getCrc32());
+    out.closeEntry();
   }
 
   def generateFieldColumns(fields: Seq[String]): Seq[Column] = {
@@ -677,67 +626,6 @@ object PredicateExportDwCAPipeline {
         case x               => "http://rs.tdwg.org/dwc/terms/" + x
       }
     }
-  }
-
-  /** Clean up the file export, moving to sensible files names instead of the part-* file name generated by spark.
-    *
-    * @param jobID
-    * @param extensionSimpleName
-    */
-  private def cleanupFileExport(
-      extensionSimpleName: String,
-      hdfsSiteConf: String,
-      coreSiteConf: String,
-      localExportPath: String
-  ) = {
-
-    log.info("Checking for " + s"$localExportPath/${extensionSimpleName}")
-
-    val localFile = new File(
-      s"$localExportPath/${extensionSimpleName}"
-    )
-
-    if (localFile.exists()) {
-      log.info("Local file exists = " + localFile.getPath)
-    } else {
-      val conf = new Configuration
-      conf.addResource(new File(hdfsSiteConf).toURI().toURL())
-      conf.addResource(new File(coreSiteConf).toURI().toURL())
-      val hdfsPrefixToUse = conf.get("fs.defaultFS")
-      val hdfsFs = FileSystem.get(URI.create(hdfsPrefixToUse), conf)
-
-      log.info("Trying to copy to Local = " + localFile.getPath)
-      // copy to local file system
-      hdfsFs.copyToLocalFile(
-        new Path(
-          hdfsPrefixToUse + s"$localExportPath/$extensionSimpleName"
-        ),
-        new Path(s"$localExportPath/$extensionSimpleName")
-      )
-    }
-
-    // move part-* file to {extension_name}.txt
-    log.info("Cleaning up extension " + extensionSimpleName)
-
-    // concat the files
-    val file = new File(s"$localExportPath/$extensionSimpleName")
-    val outputFiles = file.listFiles
-      .filter(exportFile => exportFile != null && exportFile.isFile)
-      .filter(_.getName.startsWith("part-"))
-      .map(_.getPath)
-      .toList
-
-    val combined = new FileOutputStream(s"$localExportPath/${extensionSimpleName.toLowerCase()}.txt", true).getChannel
-
-    outputFiles.foreach { file =>
-      val partFile = new FileInputStream(file).getChannel
-      combined.transferFrom(partFile, combined.size, partFile.size)
-    }
-
-    // remote temporary directory
-    FileUtils.forceDelete(
-      new File(s"$localExportPath/$extensionSimpleName")
-    )
   }
 
   def generateInterpretedExtension(extensionUri: String, extensionFields: Array[String]): Elem = {
