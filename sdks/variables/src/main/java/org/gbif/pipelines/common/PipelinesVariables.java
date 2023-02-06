@@ -16,6 +16,9 @@ public class PipelinesVariables {
   public static class Pipeline {
 
     public static final String AVRO_EXTENSION = ".avro";
+
+    public static final String PARQUET_EXTENSION = ".parquet";
+
     public static final String ALL_AVRO = "*" + AVRO_EXTENSION;
 
     public static final String ARCHIVE_TO_VERBATIM = "archive-to-verbatim";

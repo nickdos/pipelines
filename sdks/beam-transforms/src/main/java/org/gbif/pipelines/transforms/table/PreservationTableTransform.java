@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.PreservationTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.ggbn.PreservationTable;
 
-public class PreservationTableTransform extends TableTransform<PreservationTable> {
+public class PreservationTableTransform extends TableTransform {
 
   @Builder
   public PreservationTableTransform(
@@ -22,12 +21,13 @@ public class PreservationTableTransform extends TableTransform<PreservationTable
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        PreservationTable.class,
         PRESERVATION_TABLE,
         PreservationTableTransform.class.getName(),
         PRESERVATION_TABLE_RECORDS_COUNT,
+        filesPrefix,
         PreservationTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

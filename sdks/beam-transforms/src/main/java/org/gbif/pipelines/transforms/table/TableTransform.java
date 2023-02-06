@@ -1,14 +1,14 @@
 package org.gbif.pipelines.transforms.table;
 
-import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.AVRO_EXTENSION;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import lombok.NonNull;
-import org.apache.avro.file.CodecFactory;
-import org.apache.avro.specific.SpecificRecordBase;
-import org.apache.beam.sdk.io.AvroIO;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.beam.sdk.coders.AvroCoder;
+import org.apache.beam.sdk.io.FileIO;
+import org.apache.beam.sdk.io.parquet.ParquetIO;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.transforms.DoFn;
@@ -19,6 +19,8 @@ import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
+import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.gbif.pipelines.common.PipelinesVariables;
 import org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.InterpretationType;
 import org.gbif.pipelines.core.functions.SerializableFunction;
 import org.gbif.pipelines.core.pojo.ErIdrMdrContainer;
@@ -28,16 +30,12 @@ import org.gbif.pipelines.io.avro.MetadataRecord;
 import org.gbif.pipelines.transforms.common.CheckTransforms;
 
 @SuppressWarnings("ConstantConditions")
-public abstract class TableTransform<T extends SpecificRecordBase>
-    extends DoFn<KV<String, CoGbkResult>, T> {
-
-  private static final CodecFactory BASE_CODEC = CodecFactory.snappyCodec();
+public abstract class TableTransform extends DoFn<KV<String, CoGbkResult>, GenericRecord> {
 
   @NonNull private final InterpretationType recordType;
 
-  @NonNull private final Class<T> clazz;
-
-  @NonNull private final SerializableFunction<ErIdrMdrContainer, List<T>> convertFn;
+  @NonNull
+  private final SerializableFunction<ErIdrMdrContainer, List<? extends GenericRecord>> convertFn;
 
   @NonNull private TupleTag<ExtendedRecord> extendedRecordTag;
 
@@ -51,46 +49,48 @@ public abstract class TableTransform<T extends SpecificRecordBase>
 
   @NonNull private Set<String> types;
 
+  @NonNull private String filesPrefix;
+
   private final Counter counter;
 
   public TableTransform(
-      Class<T> clazz,
       InterpretationType recordType,
       String counterNamespace,
       String counterName,
-      SerializableFunction<ErIdrMdrContainer, List<T>> convertFn) {
-    this.clazz = clazz;
+      String filesPrefix,
+      SerializableFunction<ErIdrMdrContainer, List<? extends GenericRecord>> convertFn) {
+    this.filesPrefix = filesPrefix;
     this.recordType = recordType;
     this.counter = Metrics.counter(counterNamespace, counterName);
     this.convertFn = convertFn;
   }
 
-  public TableTransform<T> setExtendedRecordTag(TupleTag<ExtendedRecord> extendedRecordTag) {
+  public TableTransform setExtendedRecordTag(TupleTag<ExtendedRecord> extendedRecordTag) {
     this.extendedRecordTag = extendedRecordTag;
     return this;
   }
 
-  public TableTransform<T> setIdentifierRecordTag(TupleTag<IdentifierRecord> identifierRecordTag) {
+  public TableTransform setIdentifierRecordTag(TupleTag<IdentifierRecord> identifierRecordTag) {
     this.identifierRecordTag = identifierRecordTag;
     return this;
   }
 
-  public TableTransform<T> setMetadataRecord(PCollectionView<MetadataRecord> metadataView) {
+  public TableTransform setMetadataRecord(PCollectionView<MetadataRecord> metadataView) {
     this.metadataView = metadataView;
     return this;
   }
 
-  public TableTransform<T> setPath(String path) {
+  public TableTransform setPath(String path) {
     this.path = path;
     return this;
   }
 
-  public TableTransform<T> setNumShards(Integer numShards) {
+  public TableTransform setNumShards(Integer numShards) {
     this.numShards = numShards;
     return this;
   }
 
-  public TableTransform<T> setTypes(Set<String> types) {
+  public TableTransform setTypes(Set<String> types) {
     this.types = types;
     return this;
   }
@@ -102,17 +102,23 @@ public abstract class TableTransform<T extends SpecificRecordBase>
         : Optional.empty();
   }
 
-  public void write(PCollection<KV<String, CoGbkResult>> pCollection) {
+  public void write(PCollection<KV<String, CoGbkResult>> pCollection, Schema schema) {
     if (CheckTransforms.checkRecordType(types, recordType)) {
       pCollection
           .apply("Convert to " + recordType.name(), this.convert())
-          .apply("Write " + recordType.name(), this.write());
+          .setCoder(AvroCoder.of(schema))
+          .apply("Write " + recordType.name(), this.write(schema));
     }
   }
 
-  public AvroIO.Write<T> write() {
-    AvroIO.Write<T> write =
-        AvroIO.write(clazz).to(path).withSuffix(AVRO_EXTENSION).withCodec(BASE_CODEC);
+  public FileIO.Write<Void, GenericRecord> write(Schema schema) {
+
+    FileIO.Write<Void, GenericRecord> write =
+        FileIO.<GenericRecord>write()
+            .via(ParquetIO.sink(schema).withCompressionCodec(CompressionCodecName.SNAPPY))
+            .to(path)
+            .withPrefix(filesPrefix)
+            .withSuffix(PipelinesVariables.Pipeline.PARQUET_EXTENSION);
 
     if (numShards == null || numShards <= 0) {
       return write;
@@ -122,7 +128,7 @@ public abstract class TableTransform<T extends SpecificRecordBase>
     }
   }
 
-  public SingleOutput<KV<String, CoGbkResult>, T> convert() {
+  public SingleOutput<KV<String, CoGbkResult>, GenericRecord> convert() {
     return ParDo.of(this).withSideInputs(metadataView);
   }
 

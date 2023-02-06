@@ -16,7 +16,7 @@ import org.apache.avro.io.DatumReader;
 import org.apache.avro.specific.SpecificDatumReader;
 import org.gbif.pipelines.common.PipelinesVariables;
 import org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.InterpretationType;
-import org.gbif.pipelines.common.beam.options.InterpretationPipelineOptions;
+import org.gbif.pipelines.common.beam.options.DataWarehousePipelineOptions;
 import org.gbif.pipelines.common.beam.options.PipelinesOptionsFactory;
 import org.gbif.pipelines.common.beam.utils.PathBuilder;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
@@ -57,9 +57,12 @@ public class TableRecordWriterTest {
       "--runner=SparkRunner",
       "--inputPath=" + outputFile,
       "--targetPath=" + outputFile,
-      "--interpretationTypes=OCCURRENCE"
+      "--interpretationTypes=OCCURRENCE",
+      "--dwConnectionString=jdbc:hive2://localhost:1000/default",
+      "--dwExternalStorePath=/data/hive/"
     };
-    InterpretationPipelineOptions options = PipelinesOptionsFactory.createInterpretation(args);
+    DataWarehousePipelineOptions options =
+        PipelinesOptionsFactory.createDataWarehousePipelineInterpretation(args);
 
     Function<InterpretationType, String> pathFn =
         st -> {
@@ -135,9 +138,12 @@ public class TableRecordWriterTest {
       "--inputPath=" + outputFile,
       "--targetPath=" + outputFile,
       "--syncThreshold=0",
-      "--interpretationTypes=OCCURRENCE"
+      "--interpretationTypes=OCCURRENCE",
+      "--dwConnectionString=jdbc:hive2://localhost:1000/default",
+      "--dwExternalStorePath=/data/hive/"
     };
-    InterpretationPipelineOptions options = PipelinesOptionsFactory.createInterpretation(args);
+    DataWarehousePipelineOptions options =
+        PipelinesOptionsFactory.createDataWarehousePipelineInterpretation(args);
 
     Function<InterpretationType, String> pathFn =
         st -> {

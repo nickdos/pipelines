@@ -5,7 +5,9 @@ import static org.gbif.pipelines.common.PipelinesVariables.Metrics.AVRO_TO_HDFS_
 import java.io.Serializable;
 import lombok.Builder;
 import lombok.NonNull;
-import org.apache.beam.sdk.io.AvroIO;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.beam.sdk.io.FileIO;
+import org.apache.beam.sdk.io.parquet.ParquetIO;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.transforms.DoFn;
@@ -15,6 +17,7 @@ import org.apache.beam.sdk.transforms.join.CoGbkResult;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
+import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.gbif.pipelines.common.PipelinesVariables;
 import org.gbif.pipelines.core.converters.MultimediaConverter;
 import org.gbif.pipelines.core.converters.OccurrenceHdfsRecordConverter;
@@ -32,7 +35,6 @@ import org.gbif.pipelines.io.avro.OccurrenceHdfsRecord;
 import org.gbif.pipelines.io.avro.TaxonRecord;
 import org.gbif.pipelines.io.avro.TemporalRecord;
 import org.gbif.pipelines.io.avro.grscicoll.GrscicollRecord;
-import org.gbif.pipelines.transforms.Transform;
 
 /**
  * Beam level transformation for Occurrence HDFS Downloads Table. The transformation consumes
@@ -95,10 +97,10 @@ public class OccurrenceHdfsRecordTransform implements Serializable {
 
   @NonNull private final PCollectionView<MetadataRecord> metadataView;
 
-  public SingleOutput<KV<String, CoGbkResult>, OccurrenceHdfsRecord> converter() {
+  public SingleOutput<KV<String, CoGbkResult>, GenericRecord> converter() {
 
-    DoFn<KV<String, CoGbkResult>, OccurrenceHdfsRecord> fn =
-        new DoFn<KV<String, CoGbkResult>, OccurrenceHdfsRecord>() {
+    DoFn<KV<String, CoGbkResult>, GenericRecord> fn =
+        new DoFn<KV<String, CoGbkResult>, GenericRecord>() {
 
           private final Counter counter =
               Metrics.counter(OccurrenceHdfsRecordTransform.class, AVRO_TO_HDFS_COUNT);
@@ -160,17 +162,23 @@ public class OccurrenceHdfsRecordTransform implements Serializable {
   }
 
   /**
-   * Writes {@link OccurrenceHdfsRecord} *.avro files to path, data will be split into several
+   * Writes {@link OccurrenceHdfsRecord} *.parquet files to path, data will be split into several
    * files, uses Snappy compression codec by default
    *
    * @param toPath path with name to output files, like - directory/name
    */
-  public AvroIO.Write<OccurrenceHdfsRecord> write(String toPath, Integer numShards) {
-    AvroIO.Write<OccurrenceHdfsRecord> write =
-        AvroIO.write(OccurrenceHdfsRecord.class)
+  public FileIO.Write<Void, GenericRecord> write(
+      String toPath, String filePrefix, Integer numShards) {
+
+    FileIO.Write<Void, GenericRecord> write =
+        FileIO.<GenericRecord>write()
+            .via(
+                ParquetIO.sink(OccurrenceHdfsRecord.getClassSchema())
+                    .withCompressionCodec(CompressionCodecName.SNAPPY))
             .to(toPath)
-            .withSuffix(PipelinesVariables.Pipeline.AVRO_EXTENSION)
-            .withCodec(Transform.getBaseCodec());
+            .withPrefix(filePrefix)
+            .withSuffix(PipelinesVariables.Pipeline.PARQUET_EXTENSION);
+
     return numShards == null ? write : write.withNumShards(numShards);
   }
 }

@@ -35,6 +35,7 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
+import org.apache.beam.sdk.coders.AvroCoder;
 import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.SerializableFunction;
 import org.apache.beam.sdk.transforms.View;
@@ -48,13 +49,13 @@ import org.apache.beam.sdk.values.TypeDescriptors;
 import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType;
 import org.gbif.pipelines.common.beam.metrics.MetricsHandler;
-import org.gbif.pipelines.common.beam.options.InterpretationPipelineOptions;
+import org.gbif.pipelines.common.beam.options.DataWarehousePipelineOptions;
 import org.gbif.pipelines.common.beam.options.PipelinesOptionsFactory;
 import org.gbif.pipelines.common.beam.utils.PathBuilder;
 import org.gbif.pipelines.core.pojo.HdfsConfigs;
 import org.gbif.pipelines.core.utils.FsUtils;
 import org.gbif.pipelines.core.utils.HdfsViewUtils;
-import org.gbif.pipelines.ingest.utils.HdfsViewAvroUtils;
+import org.gbif.pipelines.ingest.utils.HdfsViewFileUtils;
 import org.gbif.pipelines.ingest.utils.SharedLockUtils;
 import org.gbif.pipelines.io.avro.AudubonRecord;
 import org.gbif.pipelines.io.avro.BasicRecord;
@@ -69,6 +70,29 @@ import org.gbif.pipelines.io.avro.MultimediaRecord;
 import org.gbif.pipelines.io.avro.OccurrenceHdfsRecord;
 import org.gbif.pipelines.io.avro.TaxonRecord;
 import org.gbif.pipelines.io.avro.TemporalRecord;
+import org.gbif.pipelines.io.avro.extension.ac.AudubonTable;
+import org.gbif.pipelines.io.avro.extension.dwc.ChronometricAgeTable;
+import org.gbif.pipelines.io.avro.extension.dwc.IdentificationTable;
+import org.gbif.pipelines.io.avro.extension.dwc.MeasurementOrFactTable;
+import org.gbif.pipelines.io.avro.extension.dwc.ResourceRelationshipTable;
+import org.gbif.pipelines.io.avro.extension.gbif.DnaDerivedDataTable;
+import org.gbif.pipelines.io.avro.extension.gbif.IdentifierTable;
+import org.gbif.pipelines.io.avro.extension.gbif.ImageTable;
+import org.gbif.pipelines.io.avro.extension.gbif.MultimediaTable;
+import org.gbif.pipelines.io.avro.extension.gbif.ReferenceTable;
+import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmAccessionTable;
+import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmMeasurementScoreTable;
+import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmMeasurementTraitTable;
+import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmMeasurementTrialTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.AmplificationTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.CloningTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.GelImageTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.LoanTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.MaterialSampleTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.PermitTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.PreparationTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.PreservationTable;
+import org.gbif.pipelines.io.avro.extension.obis.ExtendedMeasurementOrFactTable;
 import org.gbif.pipelines.io.avro.grscicoll.GrscicollRecord;
 import org.gbif.pipelines.transforms.core.BasicTransform;
 import org.gbif.pipelines.transforms.core.EventCoreTransform;
@@ -153,17 +177,18 @@ import org.slf4j.MDC;
 public class HdfsViewPipeline {
 
   public static void main(String[] args) {
-    InterpretationPipelineOptions options = PipelinesOptionsFactory.createInterpretation(args);
+    DataWarehousePipelineOptions options =
+        PipelinesOptionsFactory.createDataWarehousePipelineInterpretation(args);
     HdfsViewPipeline.run(options);
   }
 
-  public static void run(InterpretationPipelineOptions options) {
+  public static void run(DataWarehousePipelineOptions options) {
     run(options, Pipeline::create);
   }
 
   public static void run(
-      InterpretationPipelineOptions options,
-      Function<InterpretationPipelineOptions, Pipeline> pipelinesFn) {
+      DataWarehousePipelineOptions options,
+      Function<DataWarehousePipelineOptions, Pipeline> pipelinesFn) {
 
     HdfsConfigs hdfsConfigs =
         HdfsConfigs.create(options.getHdfsSiteConfig(), options.getCoreSiteConfig());
@@ -174,10 +199,12 @@ public class HdfsViewPipeline {
     RecordType recordType = options.getCoreRecordType();
     DwcTerm coreTerm = HdfsViewUtils.getCoreTerm(recordType);
 
+    String filesPrefix = datasetId + '_' + attempt;
+
     SerializableFunction<RecordType, String> pathFn =
         st ->
             PathBuilder.buildFilePathViewUsingInputPath(
-                options, recordType, st.name().toLowerCase(), datasetId + '_' + attempt);
+                options, recordType, st.name().toLowerCase());
 
     MDC.put("datasetKey", datasetId);
     MDC.put("attempt", attempt.toString());
@@ -327,7 +354,8 @@ public class HdfsViewPipeline {
         // Apply
         .apply("Group hdfs objects", CoGroupByKey.create())
         .apply("Merge to HdfsRecord", hdfsRecordTransform.converter())
-        .apply(hdfsRecordTransform.write(pathFn.apply(recordType), numberOfShards));
+        .setCoder(AvroCoder.of(OccurrenceHdfsRecord.getClassSchema()))
+        .apply(hdfsRecordTransform.write(pathFn.apply(recordType), filesPrefix, numberOfShards));
 
     // Table records
     PCollection<KV<String, CoGbkResult>> tableCollection =
@@ -345,8 +373,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(AMPLIFICATION_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, AmplificationTable.getClassSchema());
 
     IdentificationTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -355,8 +384,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(IDENTIFICATION_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, IdentificationTable.getClassSchema());
 
     MeasurementOrFactTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -365,8 +395,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(MEASUREMENT_OR_FACT_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, MeasurementOrFactTable.getClassSchema());
 
     ResourceRelationshipTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -375,8 +406,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(RESOURCE_RELATIONSHIP_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, ResourceRelationshipTable.getClassSchema());
 
     CloningTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -385,8 +417,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(CLONING_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, CloningTable.getClassSchema());
 
     GelImageTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -395,8 +428,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(GEL_IMAGE_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, GelImageTable.getClassSchema());
 
     LoanTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -405,8 +439,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(LOAN_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, LoanTable.getClassSchema());
 
     MaterialSampleTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -415,8 +450,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(MATERIAL_SAMPLE_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, MaterialSampleTable.getClassSchema());
 
     PermitTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -425,8 +461,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(PERMIT_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, PermitTable.getClassSchema());
 
     PreparationTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -435,8 +472,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(PREPARATION_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, PreparationTable.getClassSchema());
 
     PreservationTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -445,8 +483,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(PRESERVATION_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, PreservationTable.getClassSchema());
 
     GermplasmMeasurementScoreTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -455,8 +494,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(GERMPLASM_MEASUREMENT_SCORE_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, GermplasmMeasurementScoreTable.getClassSchema());
 
     GermplasmMeasurementTraitTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -465,8 +505,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(GERMPLASM_MEASUREMENT_TRAIT_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, GermplasmMeasurementTraitTable.getClassSchema());
 
     GermplasmMeasurementTrialTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -475,8 +516,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(GERMPLASM_MEASUREMENT_TRIAL_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, GermplasmMeasurementTrialTable.getClassSchema());
 
     GermplasmAccessionTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -485,8 +527,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(GERMPLASM_ACCESSION_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, GermplasmAccessionTable.getClassSchema());
 
     ExtendedMeasurementOrFactTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -495,8 +538,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(EXTENDED_MEASUREMENT_OR_FACT_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, ExtendedMeasurementOrFactTable.getClassSchema());
 
     ChronometricAgeTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -505,8 +549,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(CHRONOMETRIC_AGE_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, ChronometricAgeTable.getClassSchema());
 
     ReferenceTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -515,8 +560,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(REFERENCE_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, ReferenceTable.getClassSchema());
 
     IdentifierTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -525,8 +571,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(IDENTIFIER_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, IdentifierTable.getClassSchema());
 
     DnaDerivedDataTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -535,8 +582,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(DNA_DERIVED_DATA_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, DnaDerivedDataTable.getClassSchema());
 
     AudubonTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -545,8 +593,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(AUDUBON_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, AudubonTable.getClassSchema());
 
     MultimediaTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -555,8 +604,9 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(MULTIMEDIA_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, MultimediaTable.getClassSchema());
 
     ImageTableTransform.builder()
         .extendedRecordTag(verbatimTransform.getTag())
@@ -565,25 +615,22 @@ public class HdfsViewPipeline {
         .numShards(numberOfShards)
         .path(pathFn.apply(IMAGE_TABLE))
         .types(types)
+        .filesPrefix(filesPrefix)
         .build()
-        .write(tableCollection);
+        .write(tableCollection, ImageTable.getClassSchema());
 
     log.info("Running the pipeline");
     PipelineResult result = p.run();
 
     if (PipelineResult.State.DONE == result.waitUntilFinish()) {
-      Mutex.Action action = () -> HdfsViewAvroUtils.cleanAndMove(options);
+      Mutex.Action action = () -> HdfsViewFileUtils.copy(options);
       if (options.getTestMode()) {
         action.execute();
       } else {
         SharedLockUtils.doHdfsPrefixLock(options, action);
       }
     }
-
     log.info("Save metrics into the file and set files owner");
-    // Delete root directory of table records
-    FsUtils.deleteIfExist(
-        hdfsConfigs, PathBuilder.buildFilePathViewUsingInputPath(options, recordType));
 
     MetricsHandler.saveCountersToInputPathFile(options, result.metrics());
     String metadataPath =

@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.MaterialSampleTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.ggbn.MaterialSampleTable;
 
-public class MaterialSampleTableTransform extends TableTransform<MaterialSampleTable> {
+public class MaterialSampleTableTransform extends TableTransform {
 
   @Builder
   public MaterialSampleTableTransform(
@@ -22,12 +21,13 @@ public class MaterialSampleTableTransform extends TableTransform<MaterialSampleT
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        MaterialSampleTable.class,
         MATERIAL_SAMPLE_TABLE,
         MaterialSampleTableTransform.class.getName(),
         MATERIAL_SAMPLE_TABLE_RECORDS_COUNT,
+        filesPrefix,
         MaterialSampleTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.PermitTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.ggbn.PermitTable;
 
-public class PermitTableTransform extends TableTransform<PermitTable> {
+public class PermitTableTransform extends TableTransform {
 
   @Builder
   public PermitTableTransform(
@@ -22,12 +21,13 @@ public class PermitTableTransform extends TableTransform<PermitTable> {
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        PermitTable.class,
         PERMIT_TABLE,
         PermitTableTransform.class.getName(),
         PERMIT_TABLE_RECORDS_COUNT,
+        filesPrefix,
         PermitTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

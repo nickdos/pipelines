@@ -23,8 +23,8 @@ import static org.gbif.pipelines.common.PipelinesVariables.Metrics.PREPARATION_T
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.PRESERVATION_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.REFERENCE_TABLE_RECORDS_COUNT;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.RESOURCE_RELATIONSHIP_TABLE_RECORDS_COUNT;
-import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.AVRO_EXTENSION;
 import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType.*;
+import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.PARQUET_EXTENSION;
 import static org.gbif.pipelines.ingest.java.transforms.InterpretedAvroReader.readAvroAsFuture;
 
 import java.time.LocalDateTime;
@@ -47,7 +47,7 @@ import org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.Inte
 import org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType;
 import org.gbif.pipelines.common.beam.metrics.IngestMetrics;
 import org.gbif.pipelines.common.beam.metrics.MetricsHandler;
-import org.gbif.pipelines.common.beam.options.InterpretationPipelineOptions;
+import org.gbif.pipelines.common.beam.options.DataWarehousePipelineOptions;
 import org.gbif.pipelines.common.beam.options.PipelinesOptionsFactory;
 import org.gbif.pipelines.common.beam.utils.PathBuilder;
 import org.gbif.pipelines.core.converters.AmplificationTableConverter;
@@ -80,7 +80,7 @@ import org.gbif.pipelines.ingest.java.metrics.IngestMetricsBuilder;
 import org.gbif.pipelines.ingest.java.transforms.OccurrenceHdfsRecordConverter;
 import org.gbif.pipelines.ingest.java.transforms.TableConverter;
 import org.gbif.pipelines.ingest.java.transforms.TableRecordWriter;
-import org.gbif.pipelines.ingest.utils.HdfsViewAvroUtils;
+import org.gbif.pipelines.ingest.utils.HdfsViewFileUtils;
 import org.gbif.pipelines.ingest.utils.SharedLockUtils;
 import org.gbif.pipelines.io.avro.AudubonRecord;
 import org.gbif.pipelines.io.avro.BasicRecord;
@@ -181,11 +181,12 @@ public class HdfsViewPipeline {
   }
 
   public static void run(String[] args) {
-    InterpretationPipelineOptions options = PipelinesOptionsFactory.createInterpretation(args);
+    DataWarehousePipelineOptions options =
+        PipelinesOptionsFactory.createDataWarehousePipelineInterpretation(args);
     run(options);
   }
 
-  public static void run(InterpretationPipelineOptions options) {
+  public static void run(DataWarehousePipelineOptions options) {
     ExecutorService executor = Executors.newWorkStealingPool();
     try {
       run(options, executor);
@@ -195,7 +196,8 @@ public class HdfsViewPipeline {
   }
 
   public static void run(String[] args, ExecutorService executor) {
-    InterpretationPipelineOptions options = PipelinesOptionsFactory.createInterpretation(args);
+    DataWarehousePipelineOptions options =
+        PipelinesOptionsFactory.createDataWarehousePipelineInterpretation(args);
     run(options, executor);
   }
 
@@ -212,7 +214,7 @@ public class HdfsViewPipeline {
   }
 
   @SneakyThrows
-  public static void run(InterpretationPipelineOptions options, ExecutorService executor) {
+  public static void run(DataWarehousePipelineOptions options, ExecutorService executor) {
 
     MDC.put("datasetKey", options.getDatasetId());
     MDC.put("attempt", options.getAttempt().toString());
@@ -235,7 +237,7 @@ public class HdfsViewPipeline {
 
     Function<InterpretationType, String> pathFn =
         st -> {
-          String id = datasetId + '_' + attempt + AVRO_EXTENSION;
+          String id = datasetId + '_' + attempt + PARQUET_EXTENSION;
           return PathBuilder.buildFilePathViewUsingInputPath(
               options, recordType, st.name().toLowerCase(), id);
         };
@@ -853,15 +855,12 @@ public class HdfsViewPipeline {
         .write();
 
     // Move files
-    Mutex.Action action = () -> HdfsViewAvroUtils.cleanAndMove(options);
+    Mutex.Action action = () -> HdfsViewFileUtils.copy(options);
     if (options.getTestMode()) {
       action.execute();
     } else {
       SharedLockUtils.doHdfsPrefixLock(options, action);
     }
-    // Delete root directory of table records
-    FsUtils.deleteIfExist(
-        hdfsConfigs, PathBuilder.buildFilePathViewUsingInputPath(options, recordType));
 
     MetricsHandler.saveCountersToInputPathFile(options, metrics.getMetricsResult());
     log.info("Pipeline has been finished - {}", LocalDateTime.now());

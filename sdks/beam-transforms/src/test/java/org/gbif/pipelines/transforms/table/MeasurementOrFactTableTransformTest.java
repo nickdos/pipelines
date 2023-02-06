@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.testing.NeedsRunner;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.testing.TestPipeline;
@@ -35,7 +36,7 @@ public class MeasurementOrFactTableTransformTest {
   @Rule public final transient TestPipeline p = TestPipeline.create();
 
   @Test
-  public void noExtesnsionTest() {
+  public void noExtensionTest() {
 
     // State
     ExtendedRecord er = ExtendedRecord.newBuilder().setId("777").build();
@@ -62,7 +63,7 @@ public class MeasurementOrFactTableTransformTest {
     PCollection<KV<String, IdentifierRecord>> basicCollection =
         p.apply("Create id", Create.of(id)).apply("KV id", gbifIdTransform.toKv());
 
-    PCollection<MeasurementOrFactTable> result =
+    PCollection<GenericRecord> result =
         KeyedPCollectionTuple
             // Core
             .of(gbifIdTransform.getTag(), basicCollection)
@@ -120,7 +121,7 @@ public class MeasurementOrFactTableTransformTest {
     PCollection<KV<String, IdentifierRecord>> basicCollection =
         p.apply("Create id", Create.of(id)).apply("KV id", gbifIdTransform.toKv());
 
-    PCollection<MeasurementOrFactTable> result =
+    PCollection<GenericRecord> result =
         KeyedPCollectionTuple
             // Core
             .of(gbifIdTransform.getTag(), basicCollection)

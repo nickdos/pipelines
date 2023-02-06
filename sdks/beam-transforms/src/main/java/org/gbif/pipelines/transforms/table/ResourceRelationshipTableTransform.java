@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.ResourceRelationshipTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.dwc.ResourceRelationshipTable;
 
-public class ResourceRelationshipTableTransform extends TableTransform<ResourceRelationshipTable> {
+public class ResourceRelationshipTableTransform extends TableTransform {
 
   @Builder
   public ResourceRelationshipTableTransform(
@@ -22,12 +21,13 @@ public class ResourceRelationshipTableTransform extends TableTransform<ResourceR
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        ResourceRelationshipTable.class,
         RESOURCE_RELATIONSHIP_TABLE,
         ResourceRelationshipTableTransform.class.getName(),
         RESOURCE_RELATIONSHIP_TABLE_RECORDS_COUNT,
+        filesPrefix,
         ResourceRelationshipTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

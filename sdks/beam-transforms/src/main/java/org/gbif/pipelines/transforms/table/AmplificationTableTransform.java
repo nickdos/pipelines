@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.AmplificationTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.ggbn.AmplificationTable;
 
-public class AmplificationTableTransform extends TableTransform<AmplificationTable> {
+public class AmplificationTableTransform extends TableTransform {
 
   @Builder
   public AmplificationTableTransform(
@@ -22,12 +21,13 @@ public class AmplificationTableTransform extends TableTransform<AmplificationTab
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        AmplificationTable.class,
         AMPLIFICATION_TABLE,
         AmplificationTableTransform.class.getName(),
         AMPLIFICATION_TABLE_RECORDS_COUNT,
+        filesPrefix,
         AmplificationTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

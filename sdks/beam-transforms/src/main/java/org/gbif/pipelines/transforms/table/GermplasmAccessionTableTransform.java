@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.GermplasmAccessionTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmAccessionTable;
 
-public class GermplasmAccessionTableTransform extends TableTransform<GermplasmAccessionTable> {
+public class GermplasmAccessionTableTransform extends TableTransform {
 
   @Builder
   public GermplasmAccessionTableTransform(
@@ -22,12 +21,13 @@ public class GermplasmAccessionTableTransform extends TableTransform<GermplasmAc
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        GermplasmAccessionTable.class,
         GERMPLASM_ACCESSION_TABLE,
         GermplasmAccessionTableTransform.class.getName(),
         GERMPLASM_ACCESSION_TABLE_RECORDS_COUNT,
+        filesPrefix,
         GermplasmAccessionTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

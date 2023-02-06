@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.AudubonTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.ac.AudubonTable;
 
-public class AudubonTableTransform extends TableTransform<AudubonTable> {
+public class AudubonTableTransform extends TableTransform {
 
   @Builder
   public AudubonTableTransform(
@@ -22,12 +21,13 @@ public class AudubonTableTransform extends TableTransform<AudubonTable> {
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        AudubonTable.class,
         AUDUBON_TABLE,
         AudubonTableTransform.class.getName(),
         AUDUBON_TABLE_RECORDS_COUNT,
+        filesPrefix,
         AudubonTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

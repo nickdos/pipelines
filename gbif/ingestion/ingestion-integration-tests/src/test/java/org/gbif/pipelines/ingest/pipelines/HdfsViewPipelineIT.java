@@ -7,15 +7,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
-import org.apache.avro.file.DataFileReader;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.specific.SpecificDatumReader;
-import org.apache.avro.specific.SpecificRecordBase;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.testing.NeedsRunner;
 import org.apache.beam.sdk.testing.TestPipeline;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.avro.AvroParquetReader;
+import org.apache.parquet.hadoop.ParquetReader;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.gbif.api.vocabulary.Extension;
 import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.pipelines.common.PipelinesVariables;
+import org.gbif.pipelines.common.beam.options.DataWarehousePipelineOptions;
 import org.gbif.pipelines.common.beam.options.InterpretationPipelineOptions;
 import org.gbif.pipelines.common.beam.options.PipelinesOptionsFactory;
 import org.gbif.pipelines.core.io.SyncDataFileWriter;
@@ -90,7 +93,7 @@ public class HdfsViewPipelineIT {
       "--targetPath=" + input,
       "--numberOfShards=1",
       "--interpretationTypes=OCCURRENCE,MEASUREMENT_OR_FACT_TABLE,EXTENDED_MEASUREMENT_OR_FACT_TABLE,GERMPLASM_MEASUREMENT_TRIAL_TABLE,AUDUBON_TABLE",
-      "--properties=" + outputFile + "/data7/ingest/pipelines.yaml"
+      "--properties=" + outputFile + "/data7/ingest/pipelines.yaml",
     };
     InterpretationPipelineOptions optionsWriter =
         PipelinesOptionsFactory.createInterpretation(argsWriter);
@@ -195,22 +198,25 @@ public class HdfsViewPipelineIT {
       "--targetPath=" + output,
       "--numberOfShards=1",
       "--interpretationTypes=OCCURRENCE,MEASUREMENT_OR_FACT_TABLE,EXTENDED_MEASUREMENT_OR_FACT_TABLE,GERMPLASM_MEASUREMENT_TRIAL_TABLE,AUDUBON_TABLE",
-      "--testMode=true"
+      "--testMode=true",
+      "--dwConnectionString=jdbc:hive2://localhost:1000/default",
+      "--dwExternalStorePath=/data/hive/"
     };
-    InterpretationPipelineOptions options = PipelinesOptionsFactory.createInterpretation(args);
+    DataWarehousePipelineOptions options =
+        PipelinesOptionsFactory.createDataWarehousePipelineInterpretation(args);
     HdfsViewPipeline.run(options, opt -> p);
 
     Function<String, String> outputFn =
-        s -> output + "/occurrence/" + s + "/" + datasetKey + "_147-00000-of-00001.avro";
+        s -> output + "/occurrence/" + s + "/" + datasetKey + "_147-00000-of-00001.parquet";
 
     assertFile(OccurrenceHdfsRecord.class, outputFn.apply("occurrence"));
     assertFile(MeasurementOrFactTable.class, outputFn.apply("measurementorfacttable"));
 
-    assertFileExistFalse(outputFn.apply("germplasmmeasurementtrialtable"));
-    assertFileExistFalse(outputFn.apply("audubontable"));
-    assertFileExistFalse(outputFn.apply("extendedmeasurementorfacttable"));
-    assertFileExistFalse(outputFn.apply("permittable"));
-    assertFileExistFalse(outputFn.apply("loantable"));
+    assertFileNotExist(outputFn.apply("germplasmmeasurementtrialtable"));
+    assertFileNotExist(outputFn.apply("audubontable"));
+    assertFileNotExist(outputFn.apply("extendedmeasurementorfacttable"));
+    assertFileNotExist(outputFn.apply("permittable"));
+    assertFileNotExist(outputFn.apply("loantable"));
   }
 
   @Test
@@ -360,10 +366,13 @@ public class HdfsViewPipelineIT {
       "--targetPath=" + output,
       "--numberOfShards=1",
       "--interpretationTypes=" + recordType.name(),
-      "--testMode=true"
+      "--testMode=true",
+      "--dwConnectionString=jdbc:hive2://localhost:1000/default",
+      "--dwExternalStorePath=/data/hive/"
     };
 
-    InterpretationPipelineOptions options = PipelinesOptionsFactory.createInterpretation(args);
+    DataWarehousePipelineOptions options =
+        PipelinesOptionsFactory.createDataWarehousePipelineInterpretation(args);
     options.setCoreRecordType(recordType);
 
     HdfsViewPipeline.run(options, opt -> p);
@@ -377,27 +386,28 @@ public class HdfsViewPipelineIT {
                 + s
                 + "/"
                 + datasetKey
-                + "_147-00000-of-00001.avro";
+                + "_147-00000-of-00001.parquet";
 
     assertFile(OccurrenceHdfsRecord.class, outputFn.apply(recordType.name().toLowerCase()));
-    assertFileExistFalse(outputFn.apply("measurementorfacttable"));
-    assertFileExistFalse(outputFn.apply("extendedmeasurementorfacttable"));
-    assertFileExistFalse(outputFn.apply("germplasmmeasurementtrialtable"));
-    assertFileExistFalse(outputFn.apply("permittable"));
-    assertFileExistFalse(outputFn.apply("loantable"));
+    assertFileNotExist(outputFn.apply("measurementorfacttable"));
+    assertFileNotExist(outputFn.apply("extendedmeasurementorfacttable"));
+    assertFileNotExist(outputFn.apply("germplasmmeasurementtrialtable"));
+    assertFileNotExist(outputFn.apply("permittable"));
+    assertFileNotExist(outputFn.apply("loantable"));
   }
 
-  private void assertFileExistFalse(String output) {
+  private void assertFileNotExist(String output) {
     Assert.assertFalse(new File(output).exists());
   }
 
-  private <T extends SpecificRecordBase> void assertFile(Class<T> clazz, String output)
+  private <T extends GenericRecord> void assertFile(Class<T> clazz, String output)
       throws Exception {
-    File file = new File(output);
-    DatumReader<T> ohrDatumReader = new SpecificDatumReader<>(clazz);
-    try (DataFileReader<T> dataFileReader = new DataFileReader<>(file, ohrDatumReader)) {
-      while (dataFileReader.hasNext()) {
-        T record = dataFileReader.next();
+    try (ParquetReader<T> dataFileReader =
+        AvroParquetReader.<T>builder(
+                HadoopInputFile.fromPath(new Path(output), new Configuration()))
+            .build()) {
+      T record = null;
+      while (null != (record = dataFileReader.read())) {
         Assert.assertNotNull(record);
         Assert.assertEquals("1", record.get("gbifid"));
       }

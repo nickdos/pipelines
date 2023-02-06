@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.ImageTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.gbif.ImageTable;
 
-public class ImageTableTransform extends TableTransform<ImageTable> {
+public class ImageTableTransform extends TableTransform {
 
   @Builder
   public ImageTableTransform(
@@ -22,12 +21,13 @@ public class ImageTableTransform extends TableTransform<ImageTable> {
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        ImageTable.class,
         IMAGE_TABLE,
         ImageTableTransform.class.getName(),
         IMAGE_TABLE_RECORDS_COUNT,
+        filesPrefix,
         ImageTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

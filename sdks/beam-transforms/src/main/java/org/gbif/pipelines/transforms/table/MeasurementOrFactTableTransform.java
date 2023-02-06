@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.MeasurementOrFactTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.dwc.MeasurementOrFactTable;
 
-public class MeasurementOrFactTableTransform extends TableTransform<MeasurementOrFactTable> {
+public class MeasurementOrFactTableTransform extends TableTransform {
 
   @Builder
   public MeasurementOrFactTableTransform(
@@ -22,12 +21,13 @@ public class MeasurementOrFactTableTransform extends TableTransform<MeasurementO
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        MeasurementOrFactTable.class,
         MEASUREMENT_OR_FACT_TABLE,
         MeasurementOrFactTableTransform.class.getName(),
         MEASUREMENT_OR_FACT_TABLE_RECORDS_COUNT,
+        filesPrefix,
         MeasurementOrFactTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

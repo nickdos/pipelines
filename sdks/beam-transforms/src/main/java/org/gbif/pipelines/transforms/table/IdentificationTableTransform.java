@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.IdentificationTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.dwc.IdentificationTable;
 
-public class IdentificationTableTransform extends TableTransform<IdentificationTable> {
+public class IdentificationTableTransform extends TableTransform {
 
   @Builder
   public IdentificationTableTransform(
@@ -22,12 +21,13 @@ public class IdentificationTableTransform extends TableTransform<IdentificationT
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        IdentificationTable.class,
         IDENTIFICATION_TABLE,
         IdentificationTableTransform.class.getName(),
         IDENTIFICATION_TABLE_RECORDS_COUNT,
+        filesPrefix,
         IdentificationTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

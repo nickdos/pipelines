@@ -103,7 +103,7 @@ public class FileSystemFactory {
    * @return a {@link Configuration} based on the provided config file
    */
   @SneakyThrows
-  private static Configuration getHdfsConfiguration(String pathToConfig) {
+  public static Configuration getHdfsConfiguration(String pathToConfig) {
     Configuration config = new Configuration();
 
     // check if the hdfs-site.xml is provided

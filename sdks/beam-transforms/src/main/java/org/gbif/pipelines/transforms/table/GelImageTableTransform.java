@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.GelImageTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.ggbn.GelImageTable;
 
-public class GelImageTableTransform extends TableTransform<GelImageTable> {
+public class GelImageTableTransform extends TableTransform {
 
   @Builder
   public GelImageTableTransform(
@@ -22,12 +21,13 @@ public class GelImageTableTransform extends TableTransform<GelImageTable> {
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        GelImageTable.class,
         GEL_IMAGE_TABLE,
         GelImageTableTransform.class.getName(),
         GEL_IMAGE_TABLE_RECORDS_COUNT,
+        filesPrefix,
         GelImageTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

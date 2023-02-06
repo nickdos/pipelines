@@ -11,10 +11,8 @@ import org.gbif.pipelines.core.converters.ExtendedMeasurementOrFactTableConverte
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.obis.ExtendedMeasurementOrFactTable;
 
-public class ExtendedMeasurementOrFactTableTransform
-    extends TableTransform<ExtendedMeasurementOrFactTable> {
+public class ExtendedMeasurementOrFactTableTransform extends TableTransform {
 
   @Builder
   public ExtendedMeasurementOrFactTableTransform(
@@ -23,12 +21,13 @@ public class ExtendedMeasurementOrFactTableTransform
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        ExtendedMeasurementOrFactTable.class,
         EXTENDED_MEASUREMENT_OR_FACT_TABLE,
         ExtendedMeasurementOrFactTableTransform.class.getName(),
         EXTENDED_MEASUREMENT_OR_FACT_TABLE_RECORDS_COUNT,
+        filesPrefix,
         ExtendedMeasurementOrFactTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

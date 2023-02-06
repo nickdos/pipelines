@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.LoanTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.ggbn.LoanTable;
 
-public class LoanTableTransform extends TableTransform<LoanTable> {
+public class LoanTableTransform extends TableTransform {
 
   @Builder
   public LoanTableTransform(
@@ -22,12 +21,13 @@ public class LoanTableTransform extends TableTransform<LoanTable> {
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        LoanTable.class,
         LOAN_TABLE,
         LoanTableTransform.class.getName(),
         LOAN_TABLE_RECORDS_COUNT,
+        filesPrefix,
         LoanTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

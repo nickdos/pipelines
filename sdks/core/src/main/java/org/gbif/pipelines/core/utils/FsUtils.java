@@ -225,6 +225,29 @@ public final class FsUtils {
   }
 
   /**
+   * Copies a list files that match against a glob filter into a target directory.
+   *
+   * @param hdfsConfigs path to hdfs-site.xml config file
+   * @param globFilter filter used to filter files and paths
+   * @param targetPath target directory
+   */
+  public static void copyDirectory(HdfsConfigs hdfsConfigs, String targetPath, String globFilter) {
+    FileSystem fs = getFileSystem(hdfsConfigs, targetPath);
+    try {
+      FileStatus[] status = fs.globStatus(new Path(globFilter));
+      Path[] paths = FileUtil.stat2Paths(status);
+      for (Path path : paths) {
+        boolean copied =
+            FileUtil.copy(
+                fs, path, fs, new Path(targetPath, path.getName()), false, true, fs.getConf());
+        log.info("File {} copied status - {}", path, copied);
+      }
+    } catch (IOException e) {
+      log.warn("Can't move files using filter - {}, into path - {}", globFilter, targetPath);
+    }
+  }
+
+  /**
    * Deletes a list files that match against a glob filter into a target directory.
    *
    * @param hdfsConfigs path to hdfs-site.xml config file
@@ -432,6 +455,16 @@ public final class FsUtils {
         }
       }
       return result;
+    }
+  }
+
+  /** Deletes all files and directories that match a pattern except by the keepPath. */
+  @SneakyThrows
+  public static void deleteAllExcept(FileSystem fs, Path pattern, Path keepPath) {
+    for (FileStatus file : fs.globStatus(pattern)) {
+      if (!file.getPath().equals(keepPath)) {
+        fs.delete(file.getPath(), true);
+      }
     }
   }
 

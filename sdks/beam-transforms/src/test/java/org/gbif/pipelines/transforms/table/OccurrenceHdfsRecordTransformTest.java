@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.testing.NeedsRunner;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.testing.TestPipeline;
@@ -182,7 +183,7 @@ public class OccurrenceHdfsRecordTransformTest {
     PCollection<KV<String, AudubonRecord>> audubonCollection =
         p.apply("Create audubon", Create.of(aur)).apply("KV audubon", audubonTransform.toKv());
 
-    PCollection<OccurrenceHdfsRecord> result =
+    PCollection<GenericRecord> result =
         KeyedPCollectionTuple
             // Core
             .of(idTransform.getTag(), idCollection)

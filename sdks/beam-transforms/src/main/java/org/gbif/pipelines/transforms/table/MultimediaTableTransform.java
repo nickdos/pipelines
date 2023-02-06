@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.MultimediaTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.gbif.MultimediaTable;
 
-public class MultimediaTableTransform extends TableTransform<MultimediaTable> {
+public class MultimediaTableTransform extends TableTransform {
 
   @Builder
   public MultimediaTableTransform(
@@ -22,12 +21,13 @@ public class MultimediaTableTransform extends TableTransform<MultimediaTable> {
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        MultimediaTable.class,
         MULTIMEDIA_TABLE,
         MultimediaTableTransform.class.getName(),
         MULTIMEDIA_TABLE_RECORDS_COUNT,
+        filesPrefix,
         MultimediaTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

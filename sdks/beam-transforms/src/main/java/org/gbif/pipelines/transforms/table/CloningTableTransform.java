@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.CloningTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.ggbn.CloningTable;
 
-public class CloningTableTransform extends TableTransform<CloningTable> {
+public class CloningTableTransform extends TableTransform {
 
   @Builder
   public CloningTableTransform(
@@ -22,12 +21,13 @@ public class CloningTableTransform extends TableTransform<CloningTable> {
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        CloningTable.class,
         CLONING_TABLE,
         CloningTableTransform.class.getName(),
         CLONING_TABLE_RECORDS_COUNT,
+        filesPrefix,
         CloningTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

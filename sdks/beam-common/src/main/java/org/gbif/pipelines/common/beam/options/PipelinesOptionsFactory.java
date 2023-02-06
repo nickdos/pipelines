@@ -53,6 +53,18 @@ public final class PipelinesOptionsFactory {
   }
 
   /**
+   * Creates {@link DataWarehousePipelineOptions} from args
+   *
+   * @param args string arguments or file
+   */
+  public static DataWarehousePipelineOptions createDataWarehousePipelineInterpretation(
+      String[] args) {
+    DataWarehousePipelineOptions options = create(DataWarehousePipelineOptions.class, args);
+    registerHdfs(options);
+    return options;
+  }
+
+  /**
    * Creates {@link EsIndexingPipelineOptions} from args
    *
    * @param args string arguments or file

@@ -11,10 +11,8 @@ import org.gbif.pipelines.core.converters.GermplasmMeasurementScoreTableConverte
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmMeasurementScoreTable;
 
-public class GermplasmMeasurementScoreTableTransform
-    extends TableTransform<GermplasmMeasurementScoreTable> {
+public class GermplasmMeasurementScoreTableTransform extends TableTransform {
 
   @Builder
   public GermplasmMeasurementScoreTableTransform(
@@ -23,12 +21,13 @@ public class GermplasmMeasurementScoreTableTransform
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        GermplasmMeasurementScoreTable.class,
         GERMPLASM_MEASUREMENT_SCORE_TABLE,
         GermplasmMeasurementScoreTableTransform.class.getName(),
         MEASUREMENT_SCORE_TABLE_RECORDS_COUNT,
+        filesPrefix,
         GermplasmMeasurementScoreTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)

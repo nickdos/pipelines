@@ -11,9 +11,8 @@ import org.gbif.pipelines.core.converters.PreparationTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
-import org.gbif.pipelines.io.avro.extension.ggbn.PreparationTable;
 
-public class PreparationTableTransform extends TableTransform<PreparationTable> {
+public class PreparationTableTransform extends TableTransform {
 
   @Builder
   public PreparationTableTransform(
@@ -22,12 +21,13 @@ public class PreparationTableTransform extends TableTransform<PreparationTable> 
       PCollectionView<MetadataRecord> metadataView,
       String path,
       Integer numShards,
-      Set<String> types) {
+      Set<String> types,
+      String filesPrefix) {
     super(
-        PreparationTable.class,
         PREPARATION_TABLE,
         PreparationTableTransform.class.getName(),
         PREPARATION_TABLE_RECORDS_COUNT,
+        filesPrefix,
         PreparationTableConverter::convert);
     this.setExtendedRecordTag(extendedRecordTag)
         .setIdentifierRecordTag(identifierRecordTag)
