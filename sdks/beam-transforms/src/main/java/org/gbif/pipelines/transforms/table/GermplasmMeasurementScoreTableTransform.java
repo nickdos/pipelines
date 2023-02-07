@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.GermplasmMeasurementScoreTableConverte
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmMeasurementScoreTable;
 
 public class GermplasmMeasurementScoreTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class GermplasmMeasurementScoreTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         GERMPLASM_MEASUREMENT_SCORE_TABLE,
+        GermplasmMeasurementScoreTable.getClassSchema(),
         GermplasmMeasurementScoreTableTransform.class.getName(),
         MEASUREMENT_SCORE_TABLE_RECORDS_COUNT,
         filesPrefix,

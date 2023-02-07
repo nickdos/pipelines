@@ -44,6 +44,14 @@
       <artifactId>elasticsearch-rest-high-level-client</artifactId>
     </dependency>
 
+    <!-- Parquet handling -->
+    <dependency>
+      <groupId>org.apache.parquet</groupId>
+      <artifactId>parquet-avro</artifactId>
+    </dependency>
+
+
+
     <!-- Hadoop -->
     <dependency>
       <groupId>org.apache.hadoop</groupId>

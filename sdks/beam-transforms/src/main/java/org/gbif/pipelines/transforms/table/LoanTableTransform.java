@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.LoanTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.ggbn.LoanTable;
 
 public class LoanTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class LoanTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         LOAN_TABLE,
+        LoanTable.getClassSchema(),
         LoanTableTransform.class.getName(),
         LOAN_TABLE_RECORDS_COUNT,
         filesPrefix,

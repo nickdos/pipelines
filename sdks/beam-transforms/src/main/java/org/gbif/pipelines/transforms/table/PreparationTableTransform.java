@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.PreparationTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.ggbn.PreparationTable;
 
 public class PreparationTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class PreparationTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         PREPARATION_TABLE,
+        PreparationTable.getClassSchema(),
         PreparationTableTransform.class.getName(),
         PREPARATION_TABLE_RECORDS_COUNT,
         filesPrefix,

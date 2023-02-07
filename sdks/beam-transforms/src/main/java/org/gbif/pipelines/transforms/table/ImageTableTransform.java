@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.ImageTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.gbif.ImageTable;
 
 public class ImageTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class ImageTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         IMAGE_TABLE,
+        ImageTable.getClassSchema(),
         ImageTableTransform.class.getName(),
         IMAGE_TABLE_RECORDS_COUNT,
         filesPrefix,

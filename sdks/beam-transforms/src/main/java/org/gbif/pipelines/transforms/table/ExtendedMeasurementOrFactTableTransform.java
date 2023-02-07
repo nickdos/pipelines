@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.ExtendedMeasurementOrFactTableConverte
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.obis.ExtendedMeasurementOrFactTable;
 
 public class ExtendedMeasurementOrFactTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class ExtendedMeasurementOrFactTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         EXTENDED_MEASUREMENT_OR_FACT_TABLE,
+        ExtendedMeasurementOrFactTable.getClassSchema(),
         ExtendedMeasurementOrFactTableTransform.class.getName(),
         EXTENDED_MEASUREMENT_OR_FACT_TABLE_RECORDS_COUNT,
         filesPrefix,

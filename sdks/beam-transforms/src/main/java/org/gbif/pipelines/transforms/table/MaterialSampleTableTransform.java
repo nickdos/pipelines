@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.MaterialSampleTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.ggbn.MaterialSampleTable;
 
 public class MaterialSampleTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class MaterialSampleTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         MATERIAL_SAMPLE_TABLE,
+        MaterialSampleTable.getClassSchema(),
         MaterialSampleTableTransform.class.getName(),
         MATERIAL_SAMPLE_TABLE_RECORDS_COUNT,
         filesPrefix,

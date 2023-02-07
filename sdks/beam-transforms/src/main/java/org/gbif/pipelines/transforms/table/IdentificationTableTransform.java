@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.IdentificationTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.dwc.IdentificationTable;
 
 public class IdentificationTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class IdentificationTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         IDENTIFICATION_TABLE,
+        IdentificationTable.getClassSchema(),
         IdentificationTableTransform.class.getName(),
         IDENTIFICATION_TABLE_RECORDS_COUNT,
         filesPrefix,

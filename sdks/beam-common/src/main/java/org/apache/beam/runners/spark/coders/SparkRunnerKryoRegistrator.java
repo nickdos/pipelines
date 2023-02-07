@@ -34,6 +34,28 @@ import org.gbif.pipelines.io.avro.MultimediaRecord;
 import org.gbif.pipelines.io.avro.OccurrenceHdfsRecord;
 import org.gbif.pipelines.io.avro.TaxonRecord;
 import org.gbif.pipelines.io.avro.TemporalRecord;
+import org.gbif.pipelines.io.avro.extension.ac.AudubonTable;
+import org.gbif.pipelines.io.avro.extension.dwc.ChronometricAgeTable;
+import org.gbif.pipelines.io.avro.extension.dwc.IdentificationTable;
+import org.gbif.pipelines.io.avro.extension.dwc.MeasurementOrFactTable;
+import org.gbif.pipelines.io.avro.extension.dwc.ResourceRelationshipTable;
+import org.gbif.pipelines.io.avro.extension.gbif.DnaDerivedDataTable;
+import org.gbif.pipelines.io.avro.extension.gbif.IdentifierTable;
+import org.gbif.pipelines.io.avro.extension.gbif.ImageTable;
+import org.gbif.pipelines.io.avro.extension.gbif.MultimediaTable;
+import org.gbif.pipelines.io.avro.extension.gbif.ReferenceTable;
+import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmAccessionTable;
+import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmMeasurementScoreTable;
+import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmMeasurementTraitTable;
+import org.gbif.pipelines.io.avro.extension.germplasm.GermplasmMeasurementTrialTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.AmplificationTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.CloningTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.GelImageTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.LoanTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.MaterialSampleTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.PermitTable;
+import org.gbif.pipelines.io.avro.extension.ggbn.PreparationTable;
+import org.gbif.pipelines.io.avro.extension.obis.ExtendedMeasurementOrFactTable;
 import org.gbif.pipelines.io.avro.json.DerivedMetadataRecord;
 import org.gbif.pipelines.io.avro.json.EventInheritedRecord;
 import org.gbif.pipelines.io.avro.json.LocationInheritedRecord;
@@ -80,6 +102,30 @@ public class SparkRunnerKryoRegistrator implements KryoRegistrator {
     AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(LocationFeatureRecord.SCHEMA$));
     AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(DerivedMetadataRecord.SCHEMA$));
     AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(EventDate.SCHEMA$));
+
+    // extension tables
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(AmplificationTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(AudubonTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(ChronometricAgeTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(CloningTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(DnaDerivedDataTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(ExtendedMeasurementOrFactTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(GelImageTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(GermplasmAccessionTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(GermplasmMeasurementScoreTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(GermplasmMeasurementTrialTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(GermplasmMeasurementTraitTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(IdentificationTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(IdentifierTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(ImageTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(LoanTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(MaterialSampleTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(MeasurementOrFactTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(MultimediaTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(PermitTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(PreparationTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(ReferenceTable.SCHEMA$));
+    AVRO_SCHEMAS.$plus(TUPLE_SCHEMA.apply(ResourceRelationshipTable.SCHEMA$));
   }
 
   /** Copied from BEAM, except last line */

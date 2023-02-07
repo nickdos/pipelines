@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.ResourceRelationshipTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.dwc.ResourceRelationshipTable;
 
 public class ResourceRelationshipTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class ResourceRelationshipTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         RESOURCE_RELATIONSHIP_TABLE,
+        ResourceRelationshipTable.getClassSchema(),
         ResourceRelationshipTableTransform.class.getName(),
         RESOURCE_RELATIONSHIP_TABLE_RECORDS_COUNT,
         filesPrefix,

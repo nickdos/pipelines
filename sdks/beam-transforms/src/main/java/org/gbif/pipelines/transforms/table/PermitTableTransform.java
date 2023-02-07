@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.PermitTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.ggbn.PermitTable;
 
 public class PermitTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class PermitTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         PERMIT_TABLE,
+        PermitTable.getClassSchema(),
         PermitTableTransform.class.getName(),
         PERMIT_TABLE_RECORDS_COUNT,
         filesPrefix,

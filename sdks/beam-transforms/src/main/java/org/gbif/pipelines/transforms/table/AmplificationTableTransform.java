@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.AmplificationTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.ggbn.AmplificationTable;
 
 public class AmplificationTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class AmplificationTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         AMPLIFICATION_TABLE,
+        AmplificationTable.getClassSchema(),
         AmplificationTableTransform.class.getName(),
         AMPLIFICATION_TABLE_RECORDS_COUNT,
         filesPrefix,

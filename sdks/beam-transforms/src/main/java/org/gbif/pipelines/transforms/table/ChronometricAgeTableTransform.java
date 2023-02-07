@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.ChronometricAgeTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.dwc.ChronometricAgeTable;
 
 public class ChronometricAgeTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class ChronometricAgeTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         CHRONOMETRIC_AGE_TABLE,
+        ChronometricAgeTable.getClassSchema(),
         ChronometricAgeTableTransform.class.getName(),
         CHRONOMETRIC_AGE_TABLE_RECORDS_COUNT,
         filesPrefix,

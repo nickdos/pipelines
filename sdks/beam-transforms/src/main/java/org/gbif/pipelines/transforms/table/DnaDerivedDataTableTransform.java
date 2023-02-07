@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.DnaDerivedDataTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.gbif.DnaDerivedDataTable;
 
 public class DnaDerivedDataTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class DnaDerivedDataTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         DNA_DERIVED_DATA_TABLE,
+        DnaDerivedDataTable.getClassSchema(),
         DnaDerivedDataTableTransform.class.getName(),
         DNA_DERIVED_DATA_TABLE_RECORDS_COUNT,
         filesPrefix,

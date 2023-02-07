@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.AudubonTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.ac.AudubonTable;
 
 public class AudubonTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class AudubonTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         AUDUBON_TABLE,
+        AudubonTable.getClassSchema(),
         AudubonTableTransform.class.getName(),
         AUDUBON_TABLE_RECORDS_COUNT,
         filesPrefix,

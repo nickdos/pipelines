@@ -34,6 +34,8 @@ public abstract class TableTransform extends DoFn<KV<String, CoGbkResult>, Gener
 
   @NonNull private final InterpretationType recordType;
 
+  @NonNull private final String schema;
+
   @NonNull
   private final SerializableFunction<ErIdrMdrContainer, List<? extends GenericRecord>> convertFn;
 
@@ -55,12 +57,14 @@ public abstract class TableTransform extends DoFn<KV<String, CoGbkResult>, Gener
 
   public TableTransform(
       InterpretationType recordType,
+      Schema schema,
       String counterNamespace,
       String counterName,
       String filesPrefix,
       SerializableFunction<ErIdrMdrContainer, List<? extends GenericRecord>> convertFn) {
     this.filesPrefix = filesPrefix;
     this.recordType = recordType;
+    this.schema = schema.toString();
     this.counter = Metrics.counter(counterNamespace, counterName);
     this.convertFn = convertFn;
   }
@@ -102,20 +106,22 @@ public abstract class TableTransform extends DoFn<KV<String, CoGbkResult>, Gener
         : Optional.empty();
   }
 
-  public void write(PCollection<KV<String, CoGbkResult>> pCollection, Schema schema) {
+  public void write(PCollection<KV<String, CoGbkResult>> pCollection) {
     if (CheckTransforms.checkRecordType(types, recordType)) {
       pCollection
-          .apply("Convert to " + recordType.name(), this.convert())
-          .setCoder(AvroCoder.of(schema))
-          .apply("Write " + recordType.name(), this.write(schema));
+          .apply("Convert to " + recordType.name(), convert())
+          .setCoder(AvroCoder.of(new Schema.Parser().parse(schema)))
+          .apply("Write " + recordType.name(), write());
     }
   }
 
-  public FileIO.Write<Void, GenericRecord> write(Schema schema) {
+  public FileIO.Write<Void, GenericRecord> write() {
 
     FileIO.Write<Void, GenericRecord> write =
         FileIO.<GenericRecord>write()
-            .via(ParquetIO.sink(schema).withCompressionCodec(CompressionCodecName.SNAPPY))
+            .via(
+                ParquetIO.sink(new Schema.Parser().parse(schema))
+                    .withCompressionCodec(CompressionCodecName.SNAPPY))
             .to(path)
             .withPrefix(filesPrefix)
             .withSuffix(PipelinesVariables.Pipeline.PARQUET_EXTENSION);

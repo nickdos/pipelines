@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.ReferenceTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.gbif.ReferenceTable;
 
 public class ReferenceTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class ReferenceTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         REFERENCE_TABLE,
+        ReferenceTable.getClassSchema(),
         ReferenceTableTransform.class.getName(),
         REFERENCE_TABLE_RECORDS_COUNT,
         filesPrefix,

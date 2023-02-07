@@ -11,11 +11,14 @@ import java.util.function.Function;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetWriter;
+import org.apache.parquet.hadoop.ParquetFileWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.InterpretationType;
@@ -27,6 +30,7 @@ import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.transforms.common.CheckTransforms;
 
 @Builder
+@Slf4j
 public class TableRecordWriter<T extends GenericRecord> {
 
   @NonNull private final DataWarehousePipelineOptions options;
@@ -41,14 +45,13 @@ public class TableRecordWriter<T extends GenericRecord> {
   @SneakyThrows
   public void write() {
     if (CheckTransforms.checkRecordType(types, recordType)) {
-      try (ParquetWriter<T> writer = createWriter(options)) {
-        boolean useSyncMode = options.getSyncThreshold() > identifierRecords.size();
-        if (useSyncMode) {
-          syncWrite(writer);
-        } else {
-          CompletableFuture<?>[] futures = asyncWrite(writer);
-          CompletableFuture.allOf(futures).get();
-        }
+
+      boolean useSyncMode = options.getSyncThreshold() > identifierRecords.size();
+      if (useSyncMode) {
+        syncWrite();
+      } else {
+        CompletableFuture<?>[] futures = asyncWrite();
+        CompletableFuture.allOf(futures).get();
       }
     }
   }
@@ -56,25 +59,46 @@ public class TableRecordWriter<T extends GenericRecord> {
   /** Used to avoid verbose error handling in lambda calls. */
   @SneakyThrows
   private void writeRecord(ParquetWriter<T> writer, T record) {
-    writer.write(record);
+    try {
+      writer.write(record);
+    } catch (Exception ex) {
+      log.error("Error writing record {}", record, ex);
+      throw ex;
+    }
   }
 
-  private CompletableFuture<?>[] asyncWrite(ParquetWriter<T> writer) {
+  private CompletableFuture<?>[] asyncWrite() {
     return identifierRecords.stream()
         .map(recordFunction)
         .flatMap(List::stream)
-        .map(r -> CompletableFuture.runAsync(() -> writeRecord(writer, r), executor))
+        .map(
+            r ->
+                CompletableFuture.runAsync(
+                    () -> {
+                      try (ParquetWriter<T> writer = createWriter(options)) {
+                        writeRecord(writer, r);
+                      } catch (Exception ex) {
+                        throw new RuntimeException(ex);
+                      }
+                    },
+                    executor))
         .toArray(CompletableFuture[]::new);
   }
 
-  private void syncWrite(ParquetWriter<T> writer) {
-    identifierRecords.stream()
-        .map(recordFunction)
-        .flatMap(List::stream)
-        .forEach(record -> writeRecord(writer, record));
+  @SneakyThrows
+  private void syncWrite() {
+    try (ParquetWriter<T> writer = createWriter(options)) {
+      identifierRecords.stream()
+          .map(recordFunction)
+          .flatMap(List::stream)
+          .forEach(record -> writeRecord(writer, record));
+    }
   }
 
-  /** Create an AVRO file writer */
+  /**
+   * Create an AVRO file writer. Instances of it are not thread-safe and shouldn't be re-used in
+   * treads.
+   */
   @SneakyThrows
   private ParquetWriter<T> createWriter(InterpretationPipelineOptions options) {
     Path path = new Path(targetPathFn.apply(recordType));
@@ -88,7 +112,9 @@ public class TableRecordWriter<T extends GenericRecord> {
     return AvroParquetWriter.<T>builder(path)
         .withCompressionCodec(CompressionCodecName.SNAPPY)
         .withSchema(schema)
+        .withDataModel(GenericData.get())
         .withConf(hadoopConfiguration)
+        .withWriteMode(ParquetFileWriter.Mode.OVERWRITE)
         .build();
   }
 }

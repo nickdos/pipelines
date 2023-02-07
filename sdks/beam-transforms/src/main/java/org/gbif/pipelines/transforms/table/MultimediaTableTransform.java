@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.MultimediaTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.gbif.MultimediaTable;
 
 public class MultimediaTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class MultimediaTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         MULTIMEDIA_TABLE,
+        MultimediaTable.getClassSchema(),
         MultimediaTableTransform.class.getName(),
         MULTIMEDIA_TABLE_RECORDS_COUNT,
         filesPrefix,

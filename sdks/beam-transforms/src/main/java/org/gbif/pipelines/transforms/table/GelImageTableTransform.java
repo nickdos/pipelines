@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.GelImageTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.ggbn.GelImageTable;
 
 public class GelImageTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class GelImageTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         GEL_IMAGE_TABLE,
+        GelImageTable.getClassSchema(),
         GelImageTableTransform.class.getName(),
         GEL_IMAGE_TABLE_RECORDS_COUNT,
         filesPrefix,

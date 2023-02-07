@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.CloningTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.ggbn.CloningTable;
 
 public class CloningTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class CloningTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         CLONING_TABLE,
+        CloningTable.getClassSchema(),
         CloningTableTransform.class.getName(),
         CLONING_TABLE_RECORDS_COUNT,
         filesPrefix,

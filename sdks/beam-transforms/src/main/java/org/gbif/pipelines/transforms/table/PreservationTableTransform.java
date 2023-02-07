@@ -11,6 +11,7 @@ import org.gbif.pipelines.core.converters.PreservationTableConverter;
 import org.gbif.pipelines.io.avro.ExtendedRecord;
 import org.gbif.pipelines.io.avro.IdentifierRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
+import org.gbif.pipelines.io.avro.extension.ggbn.PreservationTable;
 
 public class PreservationTableTransform extends TableTransform {
 
@@ -25,6 +26,7 @@ public class PreservationTableTransform extends TableTransform {
       String filesPrefix) {
     super(
         PRESERVATION_TABLE,
+        PreservationTable.getClassSchema(),
         PreservationTableTransform.class.getName(),
         PRESERVATION_TABLE_RECORDS_COUNT,
         filesPrefix,
