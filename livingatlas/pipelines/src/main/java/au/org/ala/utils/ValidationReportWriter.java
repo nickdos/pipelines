@@ -62,8 +62,11 @@ public class ValidationReportWriter {
   @Parameter(names = "--checkSolr", description = "Check SOLR", arity = 1)
   private boolean checkSolr;
 
-  @Parameter(names = "--checkSSDS", description = "Check SDS", arity = 1)
+  @Parameter(names = "--checkSDS", description = "Check SDS", arity = 1)
   private boolean checkSDS = true;
+
+  @Parameter(names = "--timeBufferInMillis", description = "Check SDS", arity = 1)
+  private Integer timeBufferInMillis = 30000;
 
   @Parameter(names = "--zkHost", description = "ZK host for SOLR")
   private String zkHost;
@@ -210,7 +213,8 @@ public class ValidationReportWriter {
           }
 
           ValidationResult validationResult =
-              ValidationUtils.checkReadyForIndexing(fs, inputPath, datasetID, attempt, checkSDS);
+              ValidationUtils.checkReadyForIndexing(
+                  fs, inputPath, datasetID, attempt, checkSDS, timeBufferInMillis);
 
           // write CSV
           reportWriter.write(
