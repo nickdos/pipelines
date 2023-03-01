@@ -2,6 +2,7 @@ package org.gbif.pipelines.tasks.occurrences.hdfs;
 
 import static org.gbif.api.model.pipelines.PipelineStep.Status.COMPLETED;
 import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType.OCCURRENCE;
+import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.PARQUET_EXTENSION;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -101,10 +102,11 @@ public class HdfsViewCallbackIT {
                     + DATASET_UUID
                     + "_"
                     + attempt
-                    + ".avro");
+                    + PARQUET_EXTENSION);
 
     assertTrue(Files.exists(prFn.apply("occurrence")));
 
+    // All extensions tables mustn't exist
     assertFalse(Files.exists(prFn.apply("amplificationtable")));
     assertFalse(Files.exists(prFn.apply("chronometricagetable")));
     assertFalse(Files.exists(prFn.apply("cloningtable")));

@@ -35,10 +35,8 @@ import org.gbif.pipelines.io.avro.ImageRecord;
 import org.gbif.pipelines.io.avro.LocationRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
 import org.gbif.pipelines.io.avro.MultimediaRecord;
-import org.gbif.pipelines.io.avro.OccurrenceHdfsRecord;
 import org.gbif.pipelines.io.avro.TaxonRecord;
 import org.gbif.pipelines.io.avro.TemporalRecord;
-import org.gbif.pipelines.io.avro.extension.dwc.MeasurementOrFactTable;
 import org.gbif.pipelines.io.avro.grscicoll.GrscicollRecord;
 import org.gbif.pipelines.transforms.core.BasicTransform;
 import org.gbif.pipelines.transforms.core.EventCoreTransform;
@@ -209,8 +207,8 @@ public class HdfsViewPipelineIT {
     Function<String, String> outputFn =
         s -> output + "/occurrence/" + s + "/" + datasetKey + "_147-00000-of-00001.parquet";
 
-    assertFile(OccurrenceHdfsRecord.class, outputFn.apply("occurrence"));
-    assertFile(MeasurementOrFactTable.class, outputFn.apply("measurementorfacttable"));
+    assertFile(outputFn.apply("occurrence"));
+    assertFile(outputFn.apply("measurementorfacttable"));
 
     assertFileNotExist(outputFn.apply("germplasmmeasurementtrialtable"));
     assertFileNotExist(outputFn.apply("audubontable"));
@@ -388,7 +386,7 @@ public class HdfsViewPipelineIT {
                 + datasetKey
                 + "_147-00000-of-00001.parquet";
 
-    assertFile(OccurrenceHdfsRecord.class, outputFn.apply(recordType.name().toLowerCase()));
+    assertFile(outputFn.apply(recordType.name().toLowerCase()));
     assertFileNotExist(outputFn.apply("measurementorfacttable"));
     assertFileNotExist(outputFn.apply("extendedmeasurementorfacttable"));
     assertFileNotExist(outputFn.apply("germplasmmeasurementtrialtable"));
@@ -400,8 +398,7 @@ public class HdfsViewPipelineIT {
     Assert.assertFalse(new File(output).exists());
   }
 
-  private <T extends GenericRecord> void assertFile(Class<T> clazz, String output)
-      throws Exception {
+  private <T extends GenericRecord> void assertFile(String output) throws Exception {
     try (ParquetReader<T> dataFileReader =
         AvroParquetReader.<T>builder(
                 HadoopInputFile.fromPath(new Path(output), new Configuration()))

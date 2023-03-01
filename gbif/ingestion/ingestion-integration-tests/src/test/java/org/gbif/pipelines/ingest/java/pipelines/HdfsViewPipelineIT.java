@@ -33,11 +33,9 @@ import org.gbif.pipelines.io.avro.ImageRecord;
 import org.gbif.pipelines.io.avro.LocationRecord;
 import org.gbif.pipelines.io.avro.MetadataRecord;
 import org.gbif.pipelines.io.avro.MultimediaRecord;
-import org.gbif.pipelines.io.avro.OccurrenceHdfsRecord;
 import org.gbif.pipelines.io.avro.TaxonRecord;
 import org.gbif.pipelines.io.avro.TemporalRecord;
 import org.gbif.pipelines.io.avro.VocabularyConcept;
-import org.gbif.pipelines.io.avro.extension.dwc.MeasurementOrFactTable;
 import org.gbif.pipelines.io.avro.grscicoll.GrscicollRecord;
 import org.gbif.pipelines.transforms.core.BasicTransform;
 import org.gbif.pipelines.transforms.core.EventCoreTransform;
@@ -137,13 +135,12 @@ public class HdfsViewPipelineIT {
                 + datasetKey
                 + "_147.parquet";
 
-    assertFile(OccurrenceHdfsRecord.class, outputFn.apply(recordType.name().toLowerCase()));
-    assertFile(MeasurementOrFactTable.class, outputFn.apply("measurementorfacttable"));
+    assertFile(outputFn.apply(recordType.name().toLowerCase()));
+    assertFile(outputFn.apply("measurementorfacttable"));
 
-    assertFileExist(outputFn.apply("extendedmeasurementorfacttable"));
-    assertFileExist(outputFn.apply("germplasmmeasurementtrialtable"));
-
-    // These extensions were not in the list
+    // Extensions in the list of interpretationTypes, but must be empty and deleted
+    assertFileNotExist(outputFn.apply("extendedmeasurementorfacttable"));
+    assertFileNotExist(outputFn.apply("germplasmmeasurementtrialtable"));
     assertFileNotExist(outputFn.apply("permittable"));
     assertFileNotExist(outputFn.apply("loantable"));
   }
@@ -218,9 +215,9 @@ public class HdfsViewPipelineIT {
                 + datasetKey
                 + "_147.parquet";
 
-    assertFile(OccurrenceHdfsRecord.class, outputFn.apply(recordType.name().toLowerCase()));
+    assertFile(outputFn.apply(recordType.name().toLowerCase()));
 
-    // These extensions were not in the list
+    // Extensions in the list of interpretationTypes, but must be empty and deleted
     assertFileNotExist(outputFn.apply("measurementorfacttable"));
     assertFileNotExist(outputFn.apply("extendedmeasurementorfacttable"));
     assertFileNotExist(outputFn.apply("germplasmmeasurementtrialtable"));
@@ -349,16 +346,11 @@ public class HdfsViewPipelineIT {
     }
   }
 
-  private void assertFileExist(String output) {
-    Assert.assertTrue(new File(output).exists());
-  }
-
   private void assertFileNotExist(String output) {
     Assert.assertFalse(new File(output).exists());
   }
 
-  private <T extends GenericRecord> void assertFile(Class<T> clazz, String output)
-      throws Exception {
+  private <T extends GenericRecord> void assertFile(String output) throws Exception {
     try (ParquetReader<T> dataFileReader =
         AvroParquetReader.<T>builder(
                 HadoopInputFile.fromPath(new Path(output), new Configuration()))

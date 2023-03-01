@@ -22,6 +22,7 @@ import org.apache.parquet.hadoop.ParquetFileWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.util.HadoopOutputFile;
+import org.gbif.pipelines.common.PipelinesException;
 import org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.InterpretationType;
 import org.gbif.pipelines.common.beam.options.DataWarehousePipelineOptions;
 import org.gbif.pipelines.common.beam.options.InterpretationPipelineOptions;
@@ -46,7 +47,6 @@ public class TableRecordWriter<T extends GenericRecord> {
   @SneakyThrows
   public void write() {
     if (CheckTransforms.checkRecordType(types, recordType)) {
-
       boolean useSyncMode = options.getSyncThreshold() > identifierRecords.size();
       if (useSyncMode) {
         syncWrite();
@@ -59,11 +59,11 @@ public class TableRecordWriter<T extends GenericRecord> {
 
   /** Used to avoid verbose error handling in lambda calls. */
   @SneakyThrows
-  private void writeRecord(ParquetWriter<T> writer, T record) {
+  private void writeRecord(ParquetWriter<T> writer, T r) {
     try {
-      writer.write(record);
+      writer.write(r);
     } catch (Exception ex) {
-      log.error("Error writing record {}", record, ex);
+      log.error("Error writing record {}", r, ex);
       throw ex;
     }
   }
@@ -79,7 +79,7 @@ public class TableRecordWriter<T extends GenericRecord> {
                       try (ParquetWriter<T> writer = createWriter(options)) {
                         writeRecord(writer, r);
                       } catch (Exception ex) {
-                        throw new RuntimeException(ex);
+                        throw new PipelinesException(ex);
                       }
                     },
                     executor))
@@ -92,7 +92,7 @@ public class TableRecordWriter<T extends GenericRecord> {
       identifierRecords.stream()
           .map(recordFunction)
           .flatMap(List::stream)
-          .forEach(record -> writeRecord(writer, record));
+          .forEach(r -> writeRecord(writer, r));
     }
   }
 

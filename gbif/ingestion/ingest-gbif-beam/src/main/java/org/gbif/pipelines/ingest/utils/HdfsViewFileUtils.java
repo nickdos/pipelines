@@ -39,30 +39,33 @@ public class HdfsViewFileUtils {
   }
 
   private static void copyTables(InterpretationPipelineOptions opt, RecordType coreType) {
-
-    copy(opt, coreType, MEASUREMENT_OR_FACT_TABLE, Extension.MEASUREMENT_OR_FACT);
-    copy(opt, coreType, IDENTIFICATION_TABLE, Extension.IDENTIFICATION);
-    copy(opt, coreType, RESOURCE_RELATIONSHIP_TABLE, Extension.RESOURCE_RELATIONSHIP);
-    copy(opt, coreType, AMPLIFICATION_TABLE, Extension.AMPLIFICATION);
-    copy(opt, coreType, CLONING_TABLE, Extension.CLONING);
-    copy(opt, coreType, GEL_IMAGE_TABLE, Extension.GEL_IMAGE);
-    copy(opt, coreType, LOAN_TABLE, Extension.LOAN);
-    copy(opt, coreType, MATERIAL_SAMPLE_TABLE, Extension.MATERIAL_SAMPLE);
-    copy(opt, coreType, PERMIT_TABLE, Extension.PERMIT);
-    copy(opt, coreType, PREPARATION_TABLE, Extension.PREPARATION);
-    copy(opt, coreType, PRESERVATION_TABLE, Extension.PRESERVATION);
-    copy(opt, coreType, GERMPLASM_MEASUREMENT_SCORE_TABLE, Extension.GERMPLASM_MEASUREMENT_SCORE);
-    copy(opt, coreType, GERMPLASM_MEASUREMENT_TRAIT_TABLE, Extension.GERMPLASM_MEASUREMENT_TRAIT);
-    copy(opt, coreType, GERMPLASM_MEASUREMENT_TRIAL_TABLE, Extension.GERMPLASM_MEASUREMENT_TRIAL);
-    copy(opt, coreType, GERMPLASM_ACCESSION_TABLE, Extension.GERMPLASM_ACCESSION);
-    copy(opt, coreType, EXTENDED_MEASUREMENT_OR_FACT_TABLE, Extension.EXTENDED_MEASUREMENT_OR_FACT);
-    copy(opt, coreType, CHRONOMETRIC_AGE_TABLE, Extension.CHRONOMETRIC_AGE);
-    copy(opt, coreType, REFERENCE_TABLE, Extension.REFERENCE);
-    copy(opt, coreType, IDENTIFIER_TABLE, Extension.IDENTIFIER);
-    copy(opt, coreType, AUDUBON_TABLE, Extension.AUDUBON);
-    copy(opt, coreType, IMAGE_TABLE, Extension.IMAGE);
-    copy(opt, coreType, MULTIMEDIA_TABLE, Extension.MULTIMEDIA);
-    copy(opt, coreType, DNA_DERIVED_DATA_TABLE, Extension.DNA_DERIVED_DATA);
+    cleanOrCopy(opt, coreType, MEASUREMENT_OR_FACT_TABLE, Extension.MEASUREMENT_OR_FACT);
+    cleanOrCopy(opt, coreType, IDENTIFICATION_TABLE, Extension.IDENTIFICATION);
+    cleanOrCopy(opt, coreType, RESOURCE_RELATIONSHIP_TABLE, Extension.RESOURCE_RELATIONSHIP);
+    cleanOrCopy(opt, coreType, AMPLIFICATION_TABLE, Extension.AMPLIFICATION);
+    cleanOrCopy(opt, coreType, CLONING_TABLE, Extension.CLONING);
+    cleanOrCopy(opt, coreType, GEL_IMAGE_TABLE, Extension.GEL_IMAGE);
+    cleanOrCopy(opt, coreType, LOAN_TABLE, Extension.LOAN);
+    cleanOrCopy(opt, coreType, MATERIAL_SAMPLE_TABLE, Extension.MATERIAL_SAMPLE);
+    cleanOrCopy(opt, coreType, PERMIT_TABLE, Extension.PERMIT);
+    cleanOrCopy(opt, coreType, PREPARATION_TABLE, Extension.PREPARATION);
+    cleanOrCopy(opt, coreType, PRESERVATION_TABLE, Extension.PRESERVATION);
+    cleanOrCopy(
+        opt, coreType, GERMPLASM_MEASUREMENT_SCORE_TABLE, Extension.GERMPLASM_MEASUREMENT_SCORE);
+    cleanOrCopy(
+        opt, coreType, GERMPLASM_MEASUREMENT_TRAIT_TABLE, Extension.GERMPLASM_MEASUREMENT_TRAIT);
+    cleanOrCopy(
+        opt, coreType, GERMPLASM_MEASUREMENT_TRIAL_TABLE, Extension.GERMPLASM_MEASUREMENT_TRIAL);
+    cleanOrCopy(opt, coreType, GERMPLASM_ACCESSION_TABLE, Extension.GERMPLASM_ACCESSION);
+    cleanOrCopy(
+        opt, coreType, EXTENDED_MEASUREMENT_OR_FACT_TABLE, Extension.EXTENDED_MEASUREMENT_OR_FACT);
+    cleanOrCopy(opt, coreType, CHRONOMETRIC_AGE_TABLE, Extension.CHRONOMETRIC_AGE);
+    cleanOrCopy(opt, coreType, REFERENCE_TABLE, Extension.REFERENCE);
+    cleanOrCopy(opt, coreType, IDENTIFIER_TABLE, Extension.IDENTIFIER);
+    cleanOrCopy(opt, coreType, AUDUBON_TABLE, Extension.AUDUBON);
+    cleanOrCopy(opt, coreType, IMAGE_TABLE, Extension.IMAGE);
+    cleanOrCopy(opt, coreType, MULTIMEDIA_TABLE, Extension.MULTIMEDIA);
+    cleanOrCopy(opt, coreType, DNA_DERIVED_DATA_TABLE, Extension.DNA_DERIVED_DATA);
   }
 
   private static void moveAll(InterpretationPipelineOptions options) {
@@ -80,14 +83,34 @@ public class HdfsViewFileUtils {
     copy(options, recordType, path, path);
   }
 
-  private static <T> void copy(
+  /**
+   * When we run type ALL, the process will produce empty files, so we have to check and delete them
+   * in that case
+   */
+  private static void cleanOrCopy(
       InterpretationPipelineOptions options,
       RecordType recordType,
       RecordType extensionRecordType,
       Extension extension) {
     String from = extensionRecordType.name().toLowerCase();
     String to = extension.name().toLowerCase().replace("_", "") + "table";
-    copy(options, recordType, from, to);
+    boolean isCleaned = clean(options, recordType, extensionRecordType);
+    if (!isCleaned) {
+      copy(options, recordType, from, to);
+    }
+  }
+
+  /** Delete file if it was created but has no records inside */
+  private static boolean clean(
+      InterpretationPipelineOptions options,
+      RecordType recordType,
+      RecordType extensionRecordType) {
+    HdfsConfigs hdfsConfigs =
+        HdfsConfigs.create(options.getHdfsSiteConfig(), options.getCoreSiteConfig());
+
+    String extType = extensionRecordType.name().toLowerCase();
+    String path = PathBuilder.buildFilePathViewUsingInputPath(options, recordType, extType);
+    return FsUtils.deleteParquetFileIfEmpty(hdfsConfigs, path);
   }
 
   private static void copy(

@@ -5,6 +5,7 @@ import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.AVRO_EXTENSI
 import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.CRAP_USER;
 import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType.ALL;
 import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.USER_GROUP;
+import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.PARQUET_EXTENSION;
 
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -34,7 +35,9 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.specific.SpecificDatumReader;
+import org.apache.avro.specific.SpecificRecordBase;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.AvroFSInput;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -43,6 +46,9 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.parquet.avro.AvroParquetReader;
+import org.apache.parquet.hadoop.ParquetReader;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.gbif.dwc.terms.DwcTerm;
 import org.gbif.dwc.terms.Term;
 import org.gbif.dwc.terms.TermFactory;
@@ -448,6 +454,55 @@ public final class FsUtils {
     } else {
       boolean result = false;
       for (Path p : getFilesByExt(fs, mainPath, AVRO_EXTENSION)) {
+
+        boolean r = deleteFn.test(p);
+        if (r) {
+          result = r;
+        }
+      }
+      return result;
+    }
+  }
+
+  public static boolean deleteParquetFileIfEmpty(HdfsConfigs hdfsConfigs, String path) {
+    FileSystem fs = FsUtils.getFileSystem(hdfsConfigs, path);
+    Path fPath = new Path(path);
+    return deleteParquetFileIfEmpty(fs, fPath);
+  }
+
+  @SneakyThrows
+  public static boolean deleteParquetFileIfEmpty(FileSystem fs, Path mainPath) {
+    if (!fs.exists(mainPath)) {
+      return true;
+    }
+
+    Predicate<Path> deleteFn =
+        path -> {
+          try {
+            boolean hasNoRecords;
+            try (ParquetReader<SpecificRecordBase> dataFileReader =
+                AvroParquetReader.<SpecificRecordBase>builder(
+                        HadoopInputFile.fromPath(path, new Configuration()))
+                    .build()) {
+              hasNoRecords = dataFileReader.read() == null;
+            }
+
+            if (hasNoRecords) {
+              log.warn("File is empty - {}", path);
+              fs.delete(path, true);
+              return true;
+            }
+            return false;
+          } catch (IOException ex) {
+            throw new PipelinesException(ex);
+          }
+        };
+
+    if (fs.isFile(mainPath)) {
+      return deleteFn.test(mainPath);
+    } else {
+      boolean result = false;
+      for (Path p : getFilesByExt(fs, mainPath, PARQUET_EXTENSION)) {
 
         boolean r = deleteFn.test(p);
         if (r) {
