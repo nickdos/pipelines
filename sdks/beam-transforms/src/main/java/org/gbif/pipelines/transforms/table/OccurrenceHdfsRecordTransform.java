@@ -3,6 +3,7 @@ package org.gbif.pipelines.transforms.table;
 import static org.gbif.pipelines.common.PipelinesVariables.Metrics.AVRO_TO_HDFS_COUNT;
 
 import java.io.Serializable;
+import java.util.Collections;
 import lombok.Builder;
 import lombok.NonNull;
 import org.apache.avro.generic.GenericRecord;
@@ -174,6 +175,8 @@ public class OccurrenceHdfsRecordTransform implements Serializable {
         FileIO.<GenericRecord>write()
             .via(
                 ParquetIO.sink(OccurrenceHdfsRecord.getClassSchema())
+                    .withConfiguration(
+                        Collections.singletonMap("parquet.avro.write-old-list-structure", "false"))
                     .withCompressionCodec(CompressionCodecName.SNAPPY))
             .to(toPath)
             .withPrefix(filePrefix)

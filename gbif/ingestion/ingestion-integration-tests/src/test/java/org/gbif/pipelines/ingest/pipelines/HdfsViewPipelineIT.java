@@ -406,7 +406,7 @@ public class HdfsViewPipelineIT {
         AvroParquetReader.<T>builder(
                 HadoopInputFile.fromPath(new Path(output), new Configuration()))
             .build()) {
-      T record = null;
+      T record;
       while (null != (record = dataFileReader.read())) {
         Assert.assertNotNull(record);
         Assert.assertEquals("1", record.get("gbifid"));

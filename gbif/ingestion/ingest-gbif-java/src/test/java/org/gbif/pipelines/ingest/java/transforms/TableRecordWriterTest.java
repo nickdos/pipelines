@@ -1,19 +1,21 @@
 package org.gbif.pipelines.ingest.java.transforms;
 
-import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.AVRO_EXTENSION;
 import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.RecordType.OCCURRENCE;
+import static org.gbif.pipelines.common.PipelinesVariables.Pipeline.PARQUET_EXTENSION;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
-import org.apache.avro.file.DataFileReader;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.specific.SpecificDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.avro.AvroParquetReader;
+import org.apache.parquet.hadoop.ParquetReader;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.gbif.pipelines.common.PipelinesVariables;
 import org.gbif.pipelines.common.PipelinesVariables.Pipeline.Interpretation.InterpretationType;
 import org.gbif.pipelines.common.beam.options.DataWarehousePipelineOptions;
@@ -25,17 +27,16 @@ import org.junit.Assert;
 import org.junit.Test;
 
 public class TableRecordWriterTest {
+  private static final String GBIF_ID = "777";
 
   @Test
-  public void writerSyncTest() throws IOException {
+  public void writerSyncTest() throws Exception {
 
     // State
-    String gbifID = "777";
-
     IdentifierRecord idRecord =
-        IdentifierRecord.newBuilder().setId("1").setInternalId(gbifID).build();
+        IdentifierRecord.newBuilder().setId("1").setInternalId(GBIF_ID).build();
     IdentifierRecord skipIdRecord =
-        IdentifierRecord.newBuilder().setId("1").setInternalId("-" + gbifID).build();
+        IdentifierRecord.newBuilder().setId("1").setInternalId("-" + GBIF_ID).build();
     List<IdentifierRecord> list = Arrays.asList(idRecord, skipIdRecord);
 
     Function<IdentifierRecord, List<OccurrenceHdfsRecord>> fn =
@@ -66,7 +67,7 @@ public class TableRecordWriterTest {
 
     Function<InterpretationType, String> pathFn =
         st -> {
-          String id = options.getDatasetId() + '_' + options.getAttempt() + AVRO_EXTENSION;
+          String id = options.getDatasetId() + '_' + options.getAttempt() + PARQUET_EXTENSION;
           return PathBuilder.buildFilePathViewUsingInputPath(
               options,
               PipelinesVariables.Pipeline.Interpretation.RecordType.OCCURRENCE,
@@ -91,31 +92,22 @@ public class TableRecordWriterTest {
     File result =
         new File(
             outputFile
-                + "/d596fccb-2319-42eb-b13b-986c932780ad/146/occurrence_table/occurrence/d596fccb-2319-42eb-b13b-986c932780ad_146.avro");
-    DatumReader<OccurrenceHdfsRecord> datumReader =
-        new SpecificDatumReader<>(OccurrenceHdfsRecord.class);
-    try (DataFileReader<OccurrenceHdfsRecord> dataFileReader =
-        new DataFileReader<>(result, datumReader)) {
-      while (dataFileReader.hasNext()) {
-        OccurrenceHdfsRecord record = dataFileReader.next();
-        Assert.assertNotNull(record);
-        Assert.assertEquals(gbifID, record.getGbifid());
-      }
-    }
+                + "/d596fccb-2319-42eb-b13b-986c932780ad/146/occurrence_table/occurrence/d596fccb-2319-42eb-b13b-986c932780ad_146.parquet");
+
+    Assert.assertTrue("File doesn't exist", result.exists());
+    assertFile(result);
 
     Files.deleteIfExists(result.toPath());
   }
 
   @Test
-  public void writerAsyncTest() throws IOException {
+  public void writerAsyncTest() throws Exception {
 
     // State
-    String gbifID = "777";
-
     IdentifierRecord idRecord =
-        IdentifierRecord.newBuilder().setId("1").setInternalId(gbifID).build();
+        IdentifierRecord.newBuilder().setId("1").setInternalId(GBIF_ID).build();
     IdentifierRecord skipIdRecord =
-        IdentifierRecord.newBuilder().setId("1").setInternalId("-" + gbifID).build();
+        IdentifierRecord.newBuilder().setId("1").setInternalId("-" + GBIF_ID).build();
     List<IdentifierRecord> list = Arrays.asList(idRecord, skipIdRecord);
 
     Function<IdentifierRecord, List<OccurrenceHdfsRecord>> fn =
@@ -147,7 +139,7 @@ public class TableRecordWriterTest {
 
     Function<InterpretationType, String> pathFn =
         st -> {
-          String id = options.getDatasetId() + '_' + options.getAttempt() + AVRO_EXTENSION;
+          String id = options.getDatasetId() + '_' + options.getAttempt() + PARQUET_EXTENSION;
           return PathBuilder.buildFilePathViewUsingInputPath(
               options,
               PipelinesVariables.Pipeline.Interpretation.RecordType.OCCURRENCE,
@@ -172,18 +164,24 @@ public class TableRecordWriterTest {
     File result =
         new File(
             outputFile
-                + "/d596fccb-2319-42eb-b13b-986c932780ad/146/occurrence_table/occurrence/d596fccb-2319-42eb-b13b-986c932780ad_146.avro");
-    DatumReader<OccurrenceHdfsRecord> datumReader =
-        new SpecificDatumReader<>(OccurrenceHdfsRecord.class);
-    try (DataFileReader<OccurrenceHdfsRecord> dataFileReader =
-        new DataFileReader<>(result, datumReader)) {
-      while (dataFileReader.hasNext()) {
-        OccurrenceHdfsRecord record = dataFileReader.next();
-        Assert.assertNotNull(record);
-        Assert.assertEquals(gbifID, record.getGbifid());
-      }
-    }
+                + "/d596fccb-2319-42eb-b13b-986c932780ad/146/occurrence_table/occurrence/d596fccb-2319-42eb-b13b-986c932780ad_146.parquet");
+    Assert.assertTrue("File doesn't exist", result.exists());
+    assertFile(result);
 
     Files.deleteIfExists(result.toPath());
+  }
+
+  private <T extends GenericRecord> void assertFile(File result) throws Exception {
+    try (ParquetReader<T> dataFileReader =
+        AvroParquetReader.<T>builder(
+                HadoopInputFile.fromPath(new Path(result.toString()), new Configuration()))
+            .build()) {
+      T record;
+      while (null != (record = dataFileReader.read())) {
+        Assert.assertNotNull(record);
+        Assert.assertEquals(GBIF_ID, record.get("gbifid"));
+        System.out.println(record.get("gbifid"));
+      }
+    }
   }
 }

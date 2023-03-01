@@ -9,8 +9,6 @@ import java.util.UUID;
 import java.util.function.Function;
 import lombok.SneakyThrows;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.specific.SpecificDatumReader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
@@ -361,12 +359,11 @@ public class HdfsViewPipelineIT {
 
   private <T extends GenericRecord> void assertFile(Class<T> clazz, String output)
       throws Exception {
-    DatumReader<T> ohrDatumReader = new SpecificDatumReader<>(clazz);
     try (ParquetReader<T> dataFileReader =
         AvroParquetReader.<T>builder(
                 HadoopInputFile.fromPath(new Path(output), new Configuration()))
             .build()) {
-      T record = null;
+      T record;
       while (null != (record = dataFileReader.read())) {
         Assert.assertNotNull(record);
         Assert.assertEquals("1", record.get("gbifid"));

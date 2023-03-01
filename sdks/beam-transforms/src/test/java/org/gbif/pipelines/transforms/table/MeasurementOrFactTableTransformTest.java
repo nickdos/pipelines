@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.beam.sdk.coders.AvroCoder;
 import org.apache.beam.sdk.testing.NeedsRunner;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.testing.TestPipeline;
@@ -70,7 +71,8 @@ public class MeasurementOrFactTableTransformTest {
             .and(verbatimTransform.getTag(), verbatimCollection)
             // Apply
             .apply("Grouping objects", CoGroupByKey.create())
-            .apply("Merging", transform.convert());
+            .apply("Merging", transform.convert())
+            .setCoder(AvroCoder.of(MeasurementOrFactTable.getClassSchema()));
 
     // Should
     PAssert.that(result).empty();
@@ -128,7 +130,8 @@ public class MeasurementOrFactTableTransformTest {
             .and(verbatimTransform.getTag(), verbatimCollection)
             // Apply
             .apply("Grouping objects", CoGroupByKey.create())
-            .apply("Merging", transform.convert());
+            .apply("Merging", transform.convert())
+            .setCoder(AvroCoder.of(MeasurementOrFactTable.getClassSchema()));
 
     // Should
     MeasurementOrFactTable expected =

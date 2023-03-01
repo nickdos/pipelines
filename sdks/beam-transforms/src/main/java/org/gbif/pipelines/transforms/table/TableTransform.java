@@ -1,5 +1,6 @@
 package org.gbif.pipelines.transforms.table;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -121,6 +122,8 @@ public abstract class TableTransform extends DoFn<KV<String, CoGbkResult>, Gener
         FileIO.<GenericRecord>write()
             .via(
                 ParquetIO.sink(new Schema.Parser().parse(schema))
+                    .withConfiguration(
+                        Collections.singletonMap("parquet.avro.write-old-list-structure", "false"))
                     .withCompressionCodec(CompressionCodecName.SNAPPY))
             .to(path)
             .withPrefix(filesPrefix)

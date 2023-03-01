@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.beam.sdk.coders.AvroCoder;
 import org.apache.beam.sdk.testing.NeedsRunner;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.testing.TestPipeline;
@@ -204,7 +205,8 @@ public class OccurrenceHdfsRecordTransformTest {
             .and(audubonTransform.getTag(), audubonCollection)
             // Apply
             .apply("Grouping objects", CoGroupByKey.create())
-            .apply("Merging", transform.converter());
+            .apply("Merging", transform.converter())
+            .setCoder(AvroCoder.of(OccurrenceHdfsRecord.getClassSchema()));
 
     // Should
     OccurrenceHdfsRecord expected = new OccurrenceHdfsRecord();
