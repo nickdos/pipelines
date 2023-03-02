@@ -30,7 +30,7 @@ public class TableRecordWriterTest {
   private static final String GBIF_ID = "777";
 
   @Test
-  public void writerSyncTest() throws Exception {
+  public void writerTest() throws Exception {
 
     // State
     IdentifierRecord idRecord =
@@ -94,77 +94,6 @@ public class TableRecordWriterTest {
             outputFile
                 + "/d596fccb-2319-42eb-b13b-986c932780ad/146/occurrence_table/occurrence/d596fccb-2319-42eb-b13b-986c932780ad_146.parquet");
 
-    Assert.assertTrue("File doesn't exist", result.exists());
-    assertFile(result);
-
-    Files.deleteIfExists(result.toPath());
-  }
-
-  @Test
-  public void writerAsyncTest() throws Exception {
-
-    // State
-    IdentifierRecord idRecord =
-        IdentifierRecord.newBuilder().setId("1").setInternalId(GBIF_ID).build();
-    IdentifierRecord skipIdRecord =
-        IdentifierRecord.newBuilder().setId("1").setInternalId("-" + GBIF_ID).build();
-    List<IdentifierRecord> list = Arrays.asList(idRecord, skipIdRecord);
-
-    Function<IdentifierRecord, List<OccurrenceHdfsRecord>> fn =
-        id -> {
-          if (id.getInternalId().startsWith("-")) {
-            return Collections.emptyList();
-          }
-          OccurrenceHdfsRecord hdfsRecord = new OccurrenceHdfsRecord();
-          hdfsRecord.setGbifid(id.getInternalId());
-          return Collections.singletonList(hdfsRecord);
-        };
-
-    String outputFile = getClass().getResource("/hdfsview/occurrence/").getFile();
-
-    String[] args = {
-      "--datasetId=d596fccb-2319-42eb-b13b-986c932780ad",
-      "--attempt=146",
-      "--interpretationTypes=ALL",
-      "--runner=SparkRunner",
-      "--inputPath=" + outputFile,
-      "--targetPath=" + outputFile,
-      "--syncThreshold=0",
-      "--interpretationTypes=OCCURRENCE",
-      "--dwConnectionString=jdbc:hive2://localhost:1000/default",
-      "--dwExternalStorePath=/data/hive/"
-    };
-    DataWarehousePipelineOptions options =
-        PipelinesOptionsFactory.createDataWarehousePipelineInterpretation(args);
-
-    Function<InterpretationType, String> pathFn =
-        st -> {
-          String id = options.getDatasetId() + '_' + options.getAttempt() + PARQUET_EXTENSION;
-          return PathBuilder.buildFilePathViewUsingInputPath(
-              options,
-              PipelinesVariables.Pipeline.Interpretation.RecordType.OCCURRENCE,
-              st.name().toLowerCase(),
-              id);
-        };
-
-    // When
-    TableRecordWriter.<OccurrenceHdfsRecord>builder()
-        .recordFunction(fn)
-        .identifierRecords(list)
-        .executor(Executors.newSingleThreadExecutor())
-        .options(options)
-        .targetPathFn(pathFn)
-        .schema(OccurrenceHdfsRecord.getClassSchema())
-        .recordType(OCCURRENCE)
-        .types(options.getInterpretationTypes())
-        .build()
-        .write();
-
-    // Deserialize OccurrenceHdfsRecord from disk
-    File result =
-        new File(
-            outputFile
-                + "/d596fccb-2319-42eb-b13b-986c932780ad/146/occurrence_table/occurrence/d596fccb-2319-42eb-b13b-986c932780ad_146.parquet");
     Assert.assertTrue("File doesn't exist", result.exists());
     assertFile(result);
 

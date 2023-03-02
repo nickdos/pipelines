@@ -5,7 +5,6 @@ import static org.gbif.pipelines.core.utils.FsUtils.createParentDirectories;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import lombok.Builder;
@@ -47,12 +46,13 @@ public class TableRecordWriter<T extends GenericRecord> {
   @SneakyThrows
   public void write() {
     if (CheckTransforms.checkRecordType(types, recordType)) {
-      boolean useSyncMode = options.getSyncThreshold() > identifierRecords.size();
-      if (useSyncMode) {
-        syncWrite();
-      } else {
-        CompletableFuture<?>[] futures = asyncWrite();
-        CompletableFuture.allOf(futures).get();
+      try (ParquetWriter<T> writer = createWriter(options)) {
+        identifierRecords.stream()
+            .map(recordFunction)
+            .flatMap(List::stream)
+            .forEach(r -> writeRecord(writer, r));
+      } catch (Exception ex) {
+        throw new PipelinesException(ex);
       }
     }
   }
@@ -65,34 +65,6 @@ public class TableRecordWriter<T extends GenericRecord> {
     } catch (Exception ex) {
       log.error("Error writing record {}", r, ex);
       throw ex;
-    }
-  }
-
-  private CompletableFuture<?>[] asyncWrite() {
-    return identifierRecords.stream()
-        .map(recordFunction)
-        .flatMap(List::stream)
-        .map(
-            r ->
-                CompletableFuture.runAsync(
-                    () -> {
-                      try (ParquetWriter<T> writer = createWriter(options)) {
-                        writeRecord(writer, r);
-                      } catch (Exception ex) {
-                        throw new PipelinesException(ex);
-                      }
-                    },
-                    executor))
-        .toArray(CompletableFuture[]::new);
-  }
-
-  @SneakyThrows
-  private void syncWrite() {
-    try (ParquetWriter<T> writer = createWriter(options)) {
-      identifierRecords.stream()
-          .map(recordFunction)
-          .flatMap(List::stream)
-          .forEach(r -> writeRecord(writer, r));
     }
   }
 
