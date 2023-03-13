@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import au.org.ala.pipelines.options.ALAInterpretationPipelineOptions;
 import au.org.ala.pipelines.options.DwcaToVerbatimPipelineOptions;
 import au.org.ala.pipelines.options.UUIDPipelineOptions;
 import au.org.ala.util.ElasticUtils;

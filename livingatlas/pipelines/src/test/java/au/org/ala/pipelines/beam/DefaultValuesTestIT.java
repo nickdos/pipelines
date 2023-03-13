@@ -1,5 +1,6 @@
 package au.org.ala.pipelines.beam;
 
+import au.org.ala.pipelines.options.ALAInterpretationPipelineOptions;
 import au.org.ala.util.IntegrationTestUtils;
 import au.org.ala.utils.ValidationUtils;
 import java.io.File;

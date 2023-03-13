@@ -3,6 +3,7 @@ package au.org.ala.pipelines.beam;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import au.org.ala.pipelines.options.ALAInterpretationPipelineOptions;
 import au.org.ala.pipelines.options.IndexingPipelineOptions;
 import au.org.ala.pipelines.options.SamplingPipelineOptions;
 import au.org.ala.pipelines.options.UUIDPipelineOptions;

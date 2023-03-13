@@ -2,6 +2,7 @@ package au.org.ala.pipelines.beam;
 
 import static org.junit.Assert.*;
 
+import au.org.ala.pipelines.options.ALAInterpretationPipelineOptions;
 import au.org.ala.pipelines.options.UUIDPipelineOptions;
 import au.org.ala.util.IntegrationTestUtils;
 import au.org.ala.utils.ValidationUtils;

@@ -224,5 +224,37 @@
       {"name": "measurementMethod", "type": ["null", "string"], "default" : null, "doc": "http://rs.tdwg.org/dwc/terms/measurementMethod"},
       {"name": "measurementRemarks", "type": ["null", "string"], "default" : null, "doc": "http://rs.tdwg.org/dwc/terms/measurementRemarks"}
     ]
+  },
+  {
+    "name":"SeedbankRecord",
+    "namespace":"org.gbif.pipelines.io.avro",
+    "type":"record",
+    "fields":[
+      {"name": "id", "type": ["null", "string"], "default": null},
+      {"name": "accessionNumber", "type": ["null", "string"], "default": null},
+      {"name": "formInStorage", "type": ["null", "string"], "default": null},
+      {"name": "sampleWeight", "type": ["null", "double"], "default": null},
+      {"name": "sampleSize", "type": ["null", "double"], "default": null},
+      {"name": "purityDebris", "type": ["null", "double"], "default": null},
+      {"name": "dateCollected", "type": ["null", "long"], "default": null},
+      {"name": "dateInStorage", "type": ["null", "long"], "default": null},
+      {"name": "primaryStorageSeedBank", "type": ["null", "string"], "default": null},
+      {"name": "cultivated", "type": ["null", "string"], "default": null},
+      {"name": "primaryCollector", "type": ["null", "string"], "default": null},
+      {"name": "plantForm", "type": ["null", "string"], "default": null},
+      {"name": "thousandSeedWeight", "type": ["null", "double"], "default": null},
+      {"name": "numberPlantsSampled", "type": ["null", "double"], "default": null},
+      {"name": "testLengthInDays", "type": ["null", "double"], "default": null},
+      {"name": "numberGerminated", "type": ["null", "double"], "default": null},
+      {"name": "adjustedGermination", "type": ["null", "double"], "default": null},
+      {"name": "numberFull", "type": ["null", "double"], "default": null},
+      {"name": "numberEmpty", "type": ["null", "double"], "default": null},
+      {"name": "pretreatment", "type": ["null", "string"], "default": null},
+      {"name": "mediaSubstrate", "type": ["null", "string"], "default": null},
+      {"name": "nightTemp", "type": ["null", "double"], "default": null},
+      {"name": "dayTemp", "type": ["null", "double"], "default": null},
+      {"name": "darkHours", "type": ["null", "double"], "default": null},
+      {"name": "lightHours", "type": ["null", "double"], "default": null}
+    ]
   }
 ]

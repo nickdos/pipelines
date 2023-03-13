@@ -10,6 +10,7 @@ import au.org.ala.kvs.cache.ALANameMatchKVStoreFactory;
 import au.org.ala.kvs.cache.GeocodeKvStoreFactory;
 import au.org.ala.kvs.cache.RecordedByKVStoreFactory;
 import au.org.ala.kvs.client.ALACollectoryMetadata;
+import au.org.ala.pipelines.options.ALAInterpretationPipelineOptions;
 import au.org.ala.pipelines.transforms.ALAAttributionTransform;
 import au.org.ala.pipelines.transforms.ALABasicTransform;
 import au.org.ala.pipelines.transforms.ALADefaultValuesTransform;

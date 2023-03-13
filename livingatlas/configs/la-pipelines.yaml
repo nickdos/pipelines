@@ -113,6 +113,7 @@ gbifConfig:
     - http://rs.gbif.org/terms/1.0/Reference
     - http://rs.tdwg.org/dwc/terms/ResourceRelationship
     - http://rs.gbif.org/terms/1.0/DNADerivedData
+    - http://replace-me/terms/seedbankextension
   vocabularyConfig:
     vocabulariesPath: /data/pipelines-vocabularies/
     vocabulariesNames:
@@ -161,7 +162,7 @@ interpret:
   appName: Interpretation for {datasetId}
   interpretationTypes: ALL
   defaultDateFormat: DMYT,DMY
-  inputPath: '{fsPath}/pipelines-data/{datasetId}/1/verbatim/*.avro'
+  inputPath: '/data/pipelines-data/{datasetId}/1/verbatim/*.avro'
   # Skips GBIF id generation and copies ids from ExtendedRecord ids
   useExtendedRecordId: true
   runner: SparkRunner
