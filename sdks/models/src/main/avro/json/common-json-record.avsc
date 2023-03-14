@@ -254,7 +254,15 @@
       {"name": "nightTemp", "type": ["null", "double"], "default": null},
       {"name": "dayTemp", "type": ["null", "double"], "default": null},
       {"name": "darkHours", "type": ["null", "double"], "default": null},
-      {"name": "lightHours", "type": ["null", "double"], "default": null}
+      {"name": "lightHours", "type": ["null", "double"], "default": null},
+      {"name": "seedPerGram", "type": ["null", "double"], "default": null},
+      {"name": "purity", "type": ["null", "double"], "default": null},
+      {"name": "viability", "type": ["null", "double"], "default": null},
+      {"name": "relativeHumidity", "type": ["null", "double"], "default": null},
+      {"name": "storageTemp", "type": ["null", "double"], "default": null},
+      {"name": "testDateStarted", "type": ["null", "long"], "default": null},
+      {"name": "germinateRate", "type": ["null", "double"], "default": null},
+      {"name": "numberTested", "type": ["null", "double"], "default": null}
     ]
   }
 ]

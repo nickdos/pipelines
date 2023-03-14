@@ -20,6 +20,10 @@ import org.gbif.pipelines.transforms.Transform;
 
 public class SeedbankTransform extends Transform<ExtendedRecord, SeedbankRecord> {
 
+  private SeedbankInterpreter seedbankInterpreter;
+  private List<DateComponentOrdering> orderings;
+  private SerializableFunction<String, String> preprocessDateFn;
+
   @Builder(buildMethodName = "create")
   private SeedbankTransform(
       List<DateComponentOrdering> orderings,
@@ -29,11 +33,21 @@ public class SeedbankTransform extends Transform<ExtendedRecord, SeedbankRecord>
         ALARecordTypes.SEEDBANK,
         SeedbankTransform.class.getName(),
         SEEDBANK_RECORDS_COUNT);
+    this.orderings = orderings;
+    this.preprocessDateFn = preprocessDateFn;
   }
 
   /** Beam @Setup initializes resources */
   @Setup
-  public void setup() {}
+  public void setup() {
+    if (seedbankInterpreter == null) {
+      seedbankInterpreter =
+          SeedbankInterpreter.builder()
+              .orderings(orderings)
+              .preprocessDateFn(preprocessDateFn)
+              .create();
+    }
+  }
 
   public MapElements<SeedbankRecord, KV<String, SeedbankRecord>> toKv() {
     return MapElements.into(new TypeDescriptor<KV<String, SeedbankRecord>>() {})
@@ -50,9 +64,8 @@ public class SeedbankTransform extends Transform<ExtendedRecord, SeedbankRecord>
     if (!hasExtension(source, "http://replace-me/terms/seedbankextension")) {
       return Optional.empty();
     }
-    Optional<SeedbankRecord> optionalSeedbankRecord =
-        SeedbankInterpreter.EXTENDED_HANDLER.convert(source).get();
-    optionalSeedbankRecord.ifPresent(sr -> sr.setId(source.getId()));
-    return optionalSeedbankRecord;
+    SeedbankRecord sr = SeedbankRecord.newBuilder().setId(source.getId()).build();
+    seedbankInterpreter.interpret(source, sr);
+    return Optional.of(sr);
   }
 }

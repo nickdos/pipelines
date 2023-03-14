@@ -1,11 +1,9 @@
 package au.org.ala.pipelines.interpreters;
 
-import static org.gbif.pipelines.core.utils.ModelUtils.extractValue;
-import static org.gbif.pipelines.core.utils.ModelUtils.hasValue;
-
 import au.org.ala.term.SeedbankTerm;
 import java.time.temporal.TemporalAccessor;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.Builder;
 import org.gbif.common.parsers.core.OccurrenceParseResult;
@@ -22,10 +20,9 @@ public class SeedbankInterpreter {
   private final TemporalParser temporalParser;
   private final SerializableFunction<String, String> preprocessDateFn;
 
-  public static final ExtensionInterpretation.TargetHandler<SeedbankRecord> EXTENDED_HANDLER =
+  private final ExtensionInterpretation.TargetHandler<SeedbankRecord> handler =
       ExtensionInterpretation.extension("http://replace-me/terms/seedbankextension")
           .to(SeedbankRecord::new)
-          .map("id", SeedbankRecord::setId)
           .map(SeedbankTerm.adjustedGermination, SeedbankInterpreter::setAdjustedGermination)
           .map(SeedbankTerm.darkHours, SeedbankInterpreter::setDarkHours)
           .map(SeedbankTerm.dayTemp, SeedbankInterpreter::setDayTemp)
@@ -37,14 +34,31 @@ public class SeedbankInterpreter {
           .map(SeedbankTerm.sampleSize, SeedbankInterpreter::setSampleSize)
           .map(SeedbankTerm.sampleWeight, SeedbankInterpreter::setSampleWeight)
           .map(SeedbankTerm.testLengthInDays, SeedbankInterpreter::setTestLengthInDays)
-          .map(SeedbankTerm.thousandSeedWeight, SeedbankInterpreter::setThousandSeedWeight);
+          .map(SeedbankTerm.thousandSeedWeight, SeedbankInterpreter::setThousandSeedWeight)
+          .map(SeedbankTerm.seedPerGram, SeedbankInterpreter::setSeedPerGram)
+          .map(SeedbankTerm.purity, SeedbankInterpreter::setPurity)
+          .map(SeedbankTerm.viability, SeedbankInterpreter::setViability)
+          .map(SeedbankTerm.relativeHumidity, SeedbankInterpreter::setRelativeHumidity)
+          .map(SeedbankTerm.storageTemp, SeedbankInterpreter::setStorageTemp)
+          .map(SeedbankTerm.germinateRate, SeedbankInterpreter::setGerminateRate)
+          .map(SeedbankTerm.numberEmpty, SeedbankInterpreter::setNumberEmpty)
+          .map(SeedbankTerm.numberTested, SeedbankInterpreter::setNumberTested)
+          .map(SeedbankTerm.dateInStorage, this::interpretDateInStorage)
+          .map(SeedbankTerm.dateCollected, this::interpretDateCollected)
+          .map(SeedbankTerm.testDateStarted, this::interpretTestDateStarted);
 
   @Builder(buildMethodName = "create")
   private SeedbankInterpreter(
       List<DateComponentOrdering> orderings,
       SerializableFunction<String, String> preprocessDateFn) {
-    this.preprocessDateFn = preprocessDateFn;
     this.temporalParser = TemporalParser.create(orderings);
+    this.preprocessDateFn = preprocessDateFn;
+  }
+
+  public void interpret(ExtendedRecord er, SeedbankRecord sr) {
+    Objects.requireNonNull(er);
+    Objects.requireNonNull(sr);
+    ExtensionInterpretation.Result<SeedbankRecord> result = handler.convert(er);
   }
 
   public static void setSampleWeight(SeedbankRecord sr, String value) {
@@ -151,13 +165,77 @@ public class SeedbankInterpreter {
     }
   }
 
-  public void interpretDateCollected(ExtendedRecord er, SeedbankRecord sr) {
-    if (hasValue(er, SeedbankTerm.dateCollected)) {
-      String value = extractValue(er, SeedbankTerm.dateCollected);
-      String normalizedValue =
-          Optional.ofNullable(preprocessDateFn).map(x -> x.apply(value)).orElse(value);
-      OccurrenceParseResult<TemporalAccessor> parsed =
-          temporalParser.parseRecordedDate(normalizedValue);
+  public static void setSeedPerGram(SeedbankRecord sr, String value) {
+    try {
+      sr.setSeedPerGram(Double.parseDouble(value));
+    } catch (Exception e) {
+      // do nothing
+    }
+  }
+
+  public static void setPurity(SeedbankRecord sr, String value) {
+    try {
+      sr.setPurity(Double.parseDouble(value));
+    } catch (Exception e) {
+      // do nothing
+    }
+  }
+
+  public static void setViability(SeedbankRecord sr, String value) {
+    try {
+      sr.setViability(Double.parseDouble(value));
+    } catch (Exception e) {
+      // do nothing
+    }
+  }
+
+  public static void setRelativeHumidity(SeedbankRecord sr, String value) {
+    try {
+      sr.setRelativeHumidity(Double.parseDouble(value));
+    } catch (Exception e) {
+      // do nothing
+    }
+  }
+
+  public static void setStorageTemp(SeedbankRecord sr, String value) {
+    try {
+      sr.setStorageTemp(Double.parseDouble(value));
+    } catch (Exception e) {
+      // do nothing
+    }
+  }
+
+  public static void setGerminateRate(SeedbankRecord sr, String value) {
+    try {
+      sr.setGerminateRate(Double.parseDouble(value));
+    } catch (Exception e) {
+      // do nothing
+    }
+  }
+
+  public static void setNumberEmpty(SeedbankRecord sr, String value) {
+    try {
+      sr.setNumberEmpty(Double.parseDouble(value));
+    } catch (Exception e) {
+      // do nothing
+    }
+  }
+
+  public static void setNumberTested(SeedbankRecord sr, String value) {
+    try {
+      sr.setNumberTested(Double.parseDouble(value));
+    } catch (Exception e) {
+      // do nothing
+    }
+  }
+
+  public void interpretDateCollected(SeedbankRecord sr, String dateCollected) {
+    if (dateCollected != null) {
+      String normalised =
+          Optional.ofNullable(preprocessDateFn)
+              .map(x -> x.apply(dateCollected))
+              .orElse(dateCollected);
+      OccurrenceParseResult<TemporalAccessor> parsed = temporalParser.parseRecordedDate(normalised);
       if (parsed.isSuccessful()) {
         Optional.ofNullable(parsed.getPayload())
             .map(ta -> TemporalAccessorUtils.toDate(ta).getTime())
@@ -166,17 +244,33 @@ public class SeedbankInterpreter {
     }
   }
 
-  public void interpretDateInStorage(ExtendedRecord er, SeedbankRecord sr) {
-    if (hasValue(er, SeedbankTerm.dateInStorage)) {
-      String value = extractValue(er, SeedbankTerm.dateInStorage);
-      String normalizedValue =
-          Optional.ofNullable(preprocessDateFn).map(x -> x.apply(value)).orElse(value);
-      OccurrenceParseResult<TemporalAccessor> parsed =
-          temporalParser.parseRecordedDate(normalizedValue);
+  public void interpretDateInStorage(SeedbankRecord sr, String dateInStorage) {
+    if (dateInStorage != null) {
+      String normalised =
+          Optional.ofNullable(preprocessDateFn)
+              .map(x -> x.apply(dateInStorage))
+              .orElse(dateInStorage);
+      OccurrenceParseResult<TemporalAccessor> parsed = temporalParser.parseRecordedDate(normalised);
       if (parsed.isSuccessful()) {
         Optional.ofNullable(parsed.getPayload())
             .map(ta -> TemporalAccessorUtils.toDate(ta).getTime())
             .ifPresent(sr::setDateInStorage);
+      }
+    }
+  }
+
+  public void interpretTestDateStarted(SeedbankRecord sr, String testDateStarted) {
+    if (testDateStarted != null) {
+      String normalizedDate =
+          Optional.ofNullable(preprocessDateFn)
+              .map(x -> x.apply(testDateStarted))
+              .orElse(testDateStarted);
+      OccurrenceParseResult<TemporalAccessor> parsed =
+          temporalParser.parseRecordedDate(normalizedDate);
+      if (parsed.isSuccessful()) {
+        Optional.ofNullable(parsed.getPayload())
+            .map(ta -> TemporalAccessorUtils.toDate(ta).getTime())
+            .ifPresent(sr::setTestDateStarted);
       }
     }
   }

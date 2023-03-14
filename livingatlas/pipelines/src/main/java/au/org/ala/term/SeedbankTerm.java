@@ -19,7 +19,16 @@ public enum SeedbankTerm implements Term {
   sampleSize, // - check numeric
   sampleWeight, // - check numeric
   testLengthInDays, // - check numeric
-  thousandSeedWeight; // - check numeric
+  thousandSeedWeight,
+  seedPerGram, // - check numeric
+  purity, // - check numeric
+  viability, // - check numeric
+  relativeHumidity, // - check numeric
+  storageTemp, // - check numeric
+  testDateStarted, // - check valid date
+  germinateRate, // - check numeric
+  numberEmpty, // - check numeric
+  numberTested; // - check numeric
 
   private static final URI NS_URI = URI.create("http://REPLACE-ME/terms/");
 
